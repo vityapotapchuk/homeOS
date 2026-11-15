@@ -1,0 +1,20 @@
+# HomeOS settings for the first start. Edit this file on the card (the "bootfs"
+# drive) before you put it in the Pi. It is read once; the passwords and the key
+# in it are then wiped from the card.
+#
+# Password for HomeOS web access (at least 8 characters). Without it, set one
+# later from the console:  homeos-web --set-password
+HOMEOS_PASSWORD=
+
+# Tailscale auth key (https://login.tailscale.com/admin/settings/keys). With it the
+# Pi joins your Tailscale network and web access listens there only. Without it,
+# web access listens on your home network: http://homeos.local:8790
+TAILSCALE_AUTHKEY=
+
+# Only if you did not set a user and Wi-Fi in Raspberry Pi Imager:
+# the user to create, its password, and the Wi-Fi to join (two-letter country code).
+USER_NAME=
+USER_PASSWORD=
+WIFI_SSID=
+WIFI_PASSWORD=
+WIFI_COUNTRY=UA

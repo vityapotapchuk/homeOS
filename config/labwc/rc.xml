@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HomeOS: labwc only has to show one maximised window and the on-screen keyboard. -->
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>0</gap>
+  </core>
+
+  <windowRules>
+    <!-- The shell draws its own bars, so no title bar. Maximised (not fullscreen)
+         so the on-screen keyboard can push the window up instead of covering it. -->
+    <windowRule identifier="homeos-shell" serverDecoration="no" skipTaskbar="yes">
+      <action name="Maximize" />
+    </windowRule>
+  </windowRules>
+
+  <keyboard>
+    <default />
+    <!-- Emergency exit to the console: Ctrl+Alt+Backspace -->
+    <keybind key="C-A-BackSpace">
+      <action name="Exit" />
+    </keybind>
+  </keyboard>
+</labwc_config>

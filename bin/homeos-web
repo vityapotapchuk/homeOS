@@ -1,0 +1,4 @@
+#!/bin/sh
+# HomeOS web access. See: homeos-web --help
+here=$(dirname "$(readlink -f "$0")")
+exec python3 "$here/../shell/webshell.py" "$@"

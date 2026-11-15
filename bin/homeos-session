@@ -1,0 +1,25 @@
+#!/bin/sh
+# Runs inside labwc. Keeps the shell alive, and closes the desktop when the
+# shell exits on purpose ("Exit to console") or keeps crashing.
+here=$(dirname "$(readlink -f "$0")")
+state="${XDG_STATE_HOME:-$HOME/.local/state}/homeos"
+mkdir -p "$state"
+: > "$state/shell.log"
+
+fails=0
+while :; do
+    started=$(date +%s)
+    "$here/homeos-shell" >> "$state/shell.log" 2>&1
+    code=$?
+    [ "$code" -eq 0 ] && break
+    echo "homeos-shell stopped with code $code" >> "$state/shell.log"
+    if [ $(( $(date +%s) - started )) -lt 10 ]; then
+        fails=$((fails + 1))
+    else
+        fails=0
+    fi
+    [ "$fails" -ge 3 ] && break
+    sleep 1
+done
+
+labwc --exit 2>/dev/null || { [ -n "$LABWC_PID" ] && kill "$LABWC_PID"; }

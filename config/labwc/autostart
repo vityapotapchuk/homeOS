@@ -1,0 +1,11 @@
+# HomeOS session start-up (run by labwc with sh).
+
+# On-screen keyboard. It appears when a text field is focused; the keyboard
+# button in the shell shows or hides it by hand.
+if command -v squeekboard >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.a11y.applications screen-keyboard-enabled true 2>/dev/null
+    gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'us'), ('xkb', 'ua')]" 2>/dev/null
+    squeekboard >/dev/null 2>&1 &
+fi
+
+/opt/homeos/bin/homeos-session &

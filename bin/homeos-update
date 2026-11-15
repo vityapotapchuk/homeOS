@@ -1,0 +1,55 @@
+#!/bin/bash
+# Starts a HomeOS update. Run as root, without arguments:  sudo homeos-update
+#
+# install.sh allows the HomeOS user to run exactly this file with sudo and no
+# password, which is what "Install update" in Settings uses. It pulls the git
+# folder HomeOS was installed from and runs its install.sh again, as a
+# separate system job so that it survives the restart of web access.
+# Everything it needs comes from /opt/homeos/source, which only root can write.
+set -euo pipefail
+
+SOURCE=/opt/homeos/source
+LOG=/var/log/homeos-update.log
+UNIT=homeos-update
+
+[ "$(id -u)" -eq 0 ] || { echo "Run this with sudo." >&2; exit 1; }
+[ "$#" -eq 0 ] || { echo "homeos-update takes no arguments." >&2; exit 2; }
+
+SRC="" FLAGS="" OWNER=""
+while IFS='=' read -r key value; do
+    case "$key" in
+        SRC) SRC=$value ;;
+        FLAGS) FLAGS=$value ;;
+        OWNER) OWNER=$value ;;
+    esac
+done < "$SOURCE"
+
+for flag in $FLAGS; do
+    case "$flag" in
+        --web|--web-only|--no-autostart|--lite|--no-chromium) ;;
+        *) echo "Unexpected install option: $flag" >&2; exit 1 ;;
+    esac
+done
+id "$OWNER" >/dev/null 2>&1 || { echo "The HomeOS user is not recorded. Run install.sh again." >&2; exit 1; }
+if [ ! -d "$SRC/.git" ] || [ ! -x "$SRC/install.sh" ]; then
+    echo "HomeOS was not installed from a git folder." >&2
+    exit 1
+fi
+
+if systemctl is-active --quiet "$UNIT"; then
+    exit 0          # an update is already running
+fi
+
+JOB='
+home=$(getent passwd "$HOMEOS_USER" | cut -d: -f6)
+status=0
+runuser -u "$HOMEOS_USER" -- env HOME="$home" git -C "$HOMEOS_SRC" pull --ff-only || status=$?
+if [ "$status" -eq 0 ]; then
+    "$HOMEOS_SRC/install.sh" --no-packages $HOMEOS_FLAGS || status=$?
+fi
+echo "HOMEOS_UPDATE_EXIT=$status"
+'
+exec systemd-run --unit "$UNIT" --collect --quiet \
+    --setenv=HOMEOS_USER="$OWNER" --setenv=HOMEOS_SRC="$SRC" --setenv=HOMEOS_FLAGS="$FLAGS" \
+    -p StandardOutput=truncate:"$LOG" -p StandardError=inherit \
+    /bin/bash -c "$JOB"

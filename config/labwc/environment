@@ -1,0 +1,4 @@
+# Physical keyboard layouts: English and Ukrainian, switch with Alt+Shift.
+XKB_DEFAULT_LAYOUT=us,ua
+XKB_DEFAULT_OPTIONS=grp:alt_shift_toggle
+XCURSOR_SIZE=24

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Starts the HomeOS shell window. Extra options: --windowed --dev --size 800x480
+here=$(dirname "$(readlink -f "$0")")
+exec python3 "$here/../shell/homeos_shell.py" "$@"

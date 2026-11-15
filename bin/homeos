@@ -1,0 +1,19 @@
+#!/bin/sh
+# Starts the HomeOS desktop from the text console.
+# Inside an existing desktop session it just opens the shell in a window.
+here=$(dirname "$(readlink -f "$0")")
+
+if [ -n "$WAYLAND_DISPLAY" ] || [ -n "$DISPLAY" ]; then
+    exec "$here/homeos-shell" --windowed "$@"
+fi
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/homeos"
+mkdir -p "$state"
+labwc -C "$here/../config/labwc" > "$state/session.log" 2>&1
+code=$?
+
+if [ "$code" -ne 0 ]; then
+    echo "The HomeOS desktop stopped with an error (code $code)."
+fi
+echo "Logs: $state/session.log and $state/shell.log"
+echo "You are in the console. Type 'homeos' to start the desktop again."

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" data-theme="__HOMEOS_THEME__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="homeos-token" content="__HOMEOS_TOKEN__">
+<meta name="homeos-host" content="__HOMEOS_HOST__">
+<title>Terminal - HomeOS</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="tbar">
+  <a class="round accent" href="/" aria-label="Home" id="home">
+    <svg viewBox="0 -960 960 960"><path d="M220-180h150v-220q0-12.75 8.63-21.38Q387.25-430 400-430h160q12.75 0 21.38 8.62Q590-412.75 590-400v220h150v-390L480-765 220-570v390Zm-60 0v-390q0-14.25 6.38-27 6.37-12.75 17.62-21l260-195q15.68-12 35.84-12Q500-825 516-813l260 195q11.25 8.25 17.63 21 6.37 12.75 6.37 27v390q0 24.75-17.62 42.37Q764.75-120 740-120H560q-12.75 0-21.37-8.63Q530-137.25 530-150v-220H430v220q0 12.75-8.62 21.37Q412.75-120 400-120H220q-24.75 0-42.37-17.63Q160-155.25 160-180Zm320-293Z"/></svg>
+  </a>
+  <h1 id="title">Terminal</h1>
+  <span class="state" id="state">Connecting…</span>
+  <button class="round" id="smaller" aria-label="Smaller text"><svg viewBox="0 -960 960 960"><path d="M305-556q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h141q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H305Zm73 227q-108.16 0-183.08-75Q120-479 120-585t75-181q75-75 181.5-75t181 75Q632-691 632-584.85 632-542 618-502q-14 40-42 75l242 240q9 8.56 9 21.78T818-143q-9 9-22.22 9-13.22 0-21.78-9L533-384q-30 26-69.96 40.5Q423.08-329 378-329Zm-1-60q81.25 0 138.13-57.5Q572-504 572-585t-56.87-138.5Q458.25-781 377-781q-82.08 0-139.54 57.5Q180-666 180-585t57.46 138.5Q294.92-389 377-389Z"/></svg></button>
+  <button class="round" id="bigger" aria-label="Larger text"><svg viewBox="0 -960 960 960"><path d="M346-556h-52q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h52v-51q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v51h51q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5h-51v52q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-52Zm32 227q-108.16 0-183.08-75Q120-479 120-585t75-181q75-75 181.5-75t181 75Q632-691 632-584.85 632-542 618-502q-14 40-42 75l242 240q9 8.56 9 21.78T818-143q-9 9-22.22 9-13.22 0-21.78-9L533-384q-30 26-69.96 40.5Q423.08-329 378-329Zm-1-60q81.25 0 138.13-57.5Q572-504 572-585t-56.87-138.5Q458.25-781 377-781q-82.08 0-139.54 57.5Q180-666 180-585t57.46 138.5Q294.92-389 377-389Z"/></svg></button>
+</header>
+<div id="term"></div>
+<div class="keys" id="keys" role="toolbar" aria-label="Terminal keys">
+  <button data-key="esc">Esc</button>
+  <button data-key="tab">Tab</button>
+  <button data-key="ctrl" id="key-ctrl" aria-pressed="false">Ctrl</button>
+  <span class="gap"></span>
+  <button data-key="left" aria-label="Left arrow"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m274-450 227 227q9 9 9 21t-9 21q-9 9-21 9t-21-9L181-459q-5-5-7-10t-2-11q0-6 2-11t7-10l278-278q9-9 21-9t21 9q9 9 9 21t-9 21L274-510h496q13 0 21.5 8.5T800-480q0 13-8.5 21.5T770-450H274Z"/></svg></button>
+  <button data-key="down" aria-label="Down arrow"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M450-274v-496q0-13 8.5-21.5T480-800q13 0 21.5 8.5T510-770v496l227-227q9-9 21-9t21 9q9 9 9 21t-9 21L501-181q-5 5-10 7t-11 2q-6 0-11-2t-10-7L181-459q-9-9-9-21t9-21q9-9 21-9t21 9l227 227Z"/></svg></button>
+  <button data-key="up" aria-label="Up arrow"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M450-686 223-459q-9 9-21 9t-21-9q-9-9-9-21t9-21l278-278q5-5 10-7t11-2q6 0 11 2t10 7l278 278q9 9 9 21t-9 21q-9 9-21 9t-21-9L510-686v496q0 13-8.5 21.5T480-160q-13 0-21.5-8.5T450-190v-496Z"/></svg></button>
+  <button data-key="right" aria-label="Right arrow"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M686-450H190q-13 0-21.5-8.5T160-480q0-13 8.5-21.5T190-510h496L459-737q-9-9-9-21t9-21q9-9 21-9t21 9l278 278q5 5 7 10t2 11q0 6-2 11t-7 10L501-181q-9 9-21 9t-21-9q-9-9-9-21t9-21l227-227Z"/></svg></button>
+  <span class="gap"></span>
+  <button data-key="copy"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M300-200q-24 0-42-18t-18-42v-560q0-24 18-42t42-18h440q24 0 42 18t18 42v560q0 24-18 42t-42 18H300Zm0-60h440v-560H300v560ZM180-80q-24 0-42-18t-18-42v-590q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v590h470q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32Q662.75-80 650-80H180Zm120-180v-560 560Z"/></svg>Copy</button>
+  <button data-key="paste"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M180-120q-26 0-43-17t-17-43v-600q0-26 17-43t43-17h202q7-35 34.5-57.5T480-920q36 0 63.5 22.5T578-840h202q26 0 43 17t17 43v600q0 26-17 43t-43 17H180Zm0-60h600v-600h-60v60q0 12.75-8.62 21.37Q702.75-690 690-690H270q-12.75 0-21.37-8.63Q240-707.25 240-720v-60h-60v600Zm328.5-611.5Q520-803 520-820t-11.5-28.5Q497-860 480-860t-28.5 11.5Q440-837 440-820t11.5 28.5Q463-780 480-780t28.5-11.5Z"/></svg>Paste</button>
+</div>
+<div class="backdrop" id="backdrop" hidden></div>
+<section class="sheet" id="sheet-copy" hidden aria-label="Copy text">
+  <h2>Copy text</h2>
+  <p class="sub">Select the part you need, or copy everything shown here.</p>
+  <textarea id="copy-text" readonly spellcheck="false" aria-label="Terminal text"></textarea>
+  <div class="row end">
+    <button class="btn ghost" data-close>Close</button>
+    <button class="btn" id="copy-all">Copy all</button>
+  </div>
+</section>
+<section class="sheet" id="sheet-paste" hidden aria-label="Paste text">
+  <h2>Paste into the terminal</h2>
+  <p class="sub">Paste or type the text here, then send it.</p>
+  <textarea id="paste-text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Text to paste"></textarea>
+  <div class="row end">
+    <button class="btn ghost" data-close>Cancel</button>
+    <button class="btn" id="paste-send">Send</button>
+  </div>
+</section>
+<div class="ended" id="ended" hidden>
+  <span>The session has ended.</span>
+  <button class="btn" id="again">New session</button>
+</div>
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="terminal.js"></script>
+</body>
+</html>

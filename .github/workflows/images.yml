@@ -1,0 +1,60 @@
+name: HomeOS SD card images
+
+# Builds both images and attaches them to a release.
+# Start it by pushing a tag that begins with "images-", or with Run workflow
+# on the Actions tab.
+on:
+  push:
+    tags: ["images-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.variant }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [zero2w, pi5]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # no token may end up inside the image
+
+      - name: Point the copy at its branch, so Settings > Updates can pull
+        run: |
+          git remote set-url origin "https://github.com/${{ github.repository }}"
+          git checkout -B main
+          git config branch.main.remote origin
+          git config branch.main.merge refs/heads/main
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support parted e2fsprogs zerofree xz-utils
+          sudo update-binfmts --enable qemu-aarch64 || true
+
+      - name: Build
+        run: sudo image/build.sh ${{ matrix.variant }}
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in images-*) ;; *) TAG="images-$(date -u +%Y-%m-%d)-${GITHUB_RUN_NUMBER}" ;; esac
+          for i in 1 2 3; do
+            gh release view "$TAG" >/dev/null 2>&1 && break
+            gh release create "$TAG" --title "HomeOS images ($TAG)" --notes-file image/RELEASE.md --target "$GITHUB_SHA" && break
+            sleep 10
+          done
+          gh release upload "$TAG" out/*.img.xz out/*.sha256 --clobber

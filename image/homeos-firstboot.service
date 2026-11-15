@@ -1,0 +1,15 @@
+[Unit]
+Description=HomeOS first-boot setup
+After=network-online.target cloud-final.service
+Wants=network-online.target
+ConditionPathExists=!/var/lib/homeos/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homeos-firstboot
+RemainAfterExit=yes
+TimeoutStartSec=45min
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
