@@ -758,6 +758,7 @@ function siteWidget() {
   box.hidden = !widgetOn("site") || !tile;
   if (!tile) return;
   $("w-site-name").textContent = tile.name;
+  document.querySelector("#w-site .d-site-mark").textContent = tile.name.charAt(0).toUpperCase();
   try { $("w-site-host").textContent = new URL(tile.url).hostname.replace(/^www\./, ""); } catch (e) { $("w-site-host").textContent = ""; }
   box.onclick = () => openBrowser(tile.url);
 }

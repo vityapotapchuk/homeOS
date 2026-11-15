@@ -9,6 +9,28 @@ Roboto and Material Symbols bundled, so it looks the same on the Pi and on the w
 Everything server-side is plain Python 3 (standard library only); the interface is
 plain HTML, CSS and JavaScript with no build step.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home.webp" alt="Home: camera, printer, weather, radio and more widgets" width="100%">
+</p>
+
+| Start page and sign-in | Camera with motion events |
+|---|---|
+| ![Start page](docs/screenshots/start.webp) | ![Camera](docs/screenshots/camera.webp) |
+| **Bambu Lab printer** | **Settings** |
+| ![Printer](docs/screenshots/printer.webp) | ![Settings](docs/screenshots/settings.webp) |
+| **Apps** | **Home on an upright tablet** |
+| ![Apps](docs/screenshots/apps.webp) | ![Home on an upright tablet](docs/screenshots/home-tablet-portrait.webp) |
+
+<p align="center">
+  <img src="docs/screenshots/phone-start.webp" alt="Phone: start page" width="30%">
+  <img src="docs/screenshots/phone-home.webp" alt="Phone: Home on one screen" width="30%">
+  <img src="docs/screenshots/phone-settings.webp" alt="Phone: Settings as a list" width="30%">
+</p>
+
+<sub>Screenshots use demo data.</sub>
+
 ## What is inside
 
 - **Start page** with a large clock, the weather and an animated night sky
