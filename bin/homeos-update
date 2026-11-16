@@ -6,8 +6,9 @@
 # can change is run as root: the remote and branch come from /opt/homeos/source
 # (written by install.sh, only root can change it), the code is fetched by root
 # into /var/lib/homeos/src (owned by root), and install.sh runs from there.
-# The work runs as a separate system job so that it survives the restart of
-# web access.
+# The work (bin/homeos-update-job) runs as a separate system job so that it
+# survives the restart of web access. It is a file, not a script passed on the
+# command line: systemd-run would replace every $NAME in such a script itself.
 set -euo pipefail
 
 SOURCE=/opt/homeos/source
@@ -46,42 +47,8 @@ if systemctl is-active --quiet "$UNIT"; then
     exit 0          # an update is already running
 fi
 
-JOB='
-set -u
-export HOME=/root GIT_TERMINAL_PROMPT=0
-CLONE=/var/lib/homeos/src
-CRED=/etc/homeos/git-credentials
-git_root() {
-    local c=(-c credential.helper= -c core.hooksPath=/dev/null)
-    [ -f "$CRED" ] && c+=(-c "credential.helper=store --file=$CRED")
-    git "${c[@]}" "$@"
-}
-status=0
-install -d -m 0755 -o root -g root /var/lib/homeos
-if [ -d "$CLONE/.git" ] && [ "$(stat -c %u "$CLONE")" -eq 0 ]; then
-    git_root -C "$CLONE" remote set-url origin "$HOMEOS_REMOTE" \
-        && git_root -C "$CLONE" fetch --depth 50 origin "refs/heads/$HOMEOS_BRANCH" \
-        && git_root -C "$CLONE" reset --hard FETCH_HEAD \
-        && git_root -C "$CLONE" clean -fdxq || status=$?
-else
-    NEW=$(mktemp -d /var/lib/homeos/src.XXXXXX)
-    if git_root clone --depth 50 --branch "$HOMEOS_BRANCH" --single-branch "$HOMEOS_REMOTE" "$NEW/src"; then
-        [ -e "$CLONE" ] && mv "$CLONE" "$NEW/old"
-        mv "$NEW/src" "$CLONE"
-        rm -rf "$NEW"
-    else
-        status=1
-    fi
-fi
-if [ "$status" -eq 0 ]; then
-    chown -R root:root "$CLONE"
-    chmod -R go-w "$CLONE"
-    HOMEOS_USER="$HOMEOS_OWNER" "$CLONE/install.sh" --no-packages $HOMEOS_FLAGS || status=$?
-fi
-echo "HOMEOS_UPDATE_EXIT=$status"
-'
 exec systemd-run --unit "$UNIT" --collect --quiet \
     --setenv=HOMEOS_OWNER="$OWNER" --setenv=HOMEOS_REMOTE="$REMOTE" --setenv=HOMEOS_BRANCH="$BRANCH" \
     --setenv=HOMEOS_FLAGS="$FLAGS" \
     -p StandardOutput=truncate:"$LOG" -p StandardError=inherit \
-    /bin/bash -c "$JOB"
+    /bin/bash /opt/homeos/bin/homeos-update-job

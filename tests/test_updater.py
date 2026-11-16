@@ -22,25 +22,86 @@ class HelperScriptTests(unittest.TestCase):
 
     def setUp(self):
         with open(os.path.join(ROOT, "bin", "homeos-update"), encoding="utf-8") as f:
-            self.text = f.read()
+            self.helper = f.read()
+        with open(os.path.join(ROOT, "bin", "homeos-update-job"), encoding="utf-8") as f:
+            self.job = f.read()
 
     def test_installs_only_from_the_root_copy(self):
-        runs = re.findall(r'"\$[A-Z_]+/install\.sh"', self.text)
+        runs = re.findall(r'"\$[A-Z_]+/install\.sh"', self.job)
         self.assertEqual(runs, ['"$CLONE/install.sh"'])
-        self.assertIn("CLONE=/var/lib/homeos/src", self.text)
-        self.assertIn("chown -R root:root", self.text)
+        self.assertIn("CLONE=/var/lib/homeos/src", self.job)
+        self.assertIn("chown -R root:root", self.job)
+        code = [l for l in self.helper.splitlines() if not l.lstrip().startswith("#") and "echo" not in l]
+        self.assertFalse([l for l in code if "install.sh" in l], "the helper itself runs install.sh")
 
     def test_reads_nothing_from_the_users_folder(self):
-        self.assertNotIn("SRC)", self.text)          # the user's folder is not even read
-        self.assertNotIn("runuser", self.text)
-        self.assertIn("core.hooksPath=/dev/null", self.text)
+        both = self.helper + self.job
+        self.assertNotIn("SRC)", both)
+        self.assertNotIn("runuser", both)
+        self.assertIn("core.hooksPath=/dev/null", self.job)
+
+    def test_no_script_on_the_systemd_command_line(self):
+        # systemd-run replaces $NAME in its command line, which broke the inline job in 0.19.0
+        cmd = self.helper[self.helper.index("exec systemd-run"):]
+        self.assertNotIn("bash -c", cmd)
+        self.assertIn("/opt/homeos/bin/homeos-update-job", cmd)
+        for line in cmd.splitlines():
+            for var in re.findall(r"\$\{?([A-Za-z_]+)", line):
+                self.assertIn(var, ("UNIT", "OWNER", "REMOTE", "BRANCH", "FLAGS", "LOG"), line)
 
     def test_checks_its_inputs(self):
-        self.assertIn('stat -c %u "$SOURCE"', self.text)
-        self.assertIn("--web|--web-only|--no-autostart|--lite|--no-chromium", self.text)
+        self.assertIn('stat -c %u "$SOURCE"', self.helper)
+        self.assertIn("--web|--web-only|--no-autostart|--lite|--no-chromium", self.helper)
 
     def test_shell_syntax(self):
-        subprocess.run(["bash", "-n", os.path.join(ROOT, "bin", "homeos-update")], check=True)
+        for name in ("homeos-update", "homeos-update-job"):
+            subprocess.run(["bash", "-n", os.path.join(ROOT, "bin", name)], check=True)
+
+
+@unittest.skipUnless(os.geteuid() == 0, "the update job runs as root")
+class JobRunTests(unittest.TestCase):
+    """Runs the real job against a local repository, with its folders moved into a sandbox."""
+
+    def setUp(self):
+        self.box = tempfile.mkdtemp(prefix="homeos-job-")
+        self.remote = os.path.join(self.box, "remote")
+        os.makedirs(self.remote)
+        git("init", "-q", "-b", "main", cwd=self.remote)
+        with open(os.path.join(self.remote, "install.sh"), "w") as f:
+            f.write('#!/bin/bash\necho "from=$(dirname "$0") user=$HOMEOS_USER args=$*" > "%s/marker"\n' % self.box)
+        os.chmod(os.path.join(self.remote, "install.sh"), 0o755)
+        git("add", ".", cwd=self.remote)
+        git("-c", "commit.gpgsign=false", "commit", "-qm", "v1", cwd=self.remote)
+        with open(os.path.join(ROOT, "bin", "homeos-update-job"), encoding="utf-8") as f:
+            job = f.read()
+        state = os.path.join(self.box, "state")
+        job = job.replace("/var/lib/homeos/src", state + "/src").replace("/var/lib/homeos", state) \
+                 .replace("/etc/homeos/git-credentials", self.box + "/no-credentials")
+        self.job = os.path.join(self.box, "job.sh")
+        with open(self.job, "w") as f:
+            f.write(job)
+
+    def tearDown(self):
+        shutil.rmtree(self.box, ignore_errors=True)
+
+    def run_job(self):
+        env = dict(os.environ, HOMEOS_OWNER="someone", HOMEOS_REMOTE=self.remote, HOMEOS_BRANCH="main",
+                   HOMEOS_FLAGS="--web")
+        p = subprocess.run(["bash", self.job], env=env, capture_output=True, text=True)
+        self.assertIn("HOMEOS_UPDATE_EXIT=0", p.stdout, p.stdout + p.stderr)
+        with open(os.path.join(self.box, "marker")) as f:
+            return f.read()
+
+    def test_first_and_second_update(self):
+        out = self.run_job()
+        self.assertIn("from=%s/state/src" % self.box, out)
+        self.assertIn("user=someone args=--no-packages --web", out)
+        git("-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "v2", cwd=self.remote)
+        self.run_job()
+        head = subprocess.run(["git", "-C", os.path.join(self.box, "state", "src"), "log", "-1", "--format=%s"],
+                              capture_output=True, text=True).stdout.strip()
+        self.assertEqual(head, "v2")
+        self.assertEqual(os.stat(os.path.join(self.box, "state", "src")).st_uid, 0)
 
 
 class CheckTests(unittest.TestCase):

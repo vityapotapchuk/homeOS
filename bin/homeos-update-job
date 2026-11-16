@@ -1,0 +1,39 @@
+#!/bin/bash
+# The update itself, started by bin/homeos-update as a system job (as root).
+# Fetches HOMEOS_REMOTE / HOMEOS_BRANCH into /var/lib/homeos/src, a copy only
+# root can change, and runs install.sh from there for HOMEOS_OWNER.
+set -u
+[ "$(id -u)" -eq 0 ] || { echo "Run by homeos-update only." >&2; exit 1; }
+: "${HOMEOS_OWNER:?}" "${HOMEOS_REMOTE:?}" "${HOMEOS_BRANCH:?}"
+HOMEOS_FLAGS=${HOMEOS_FLAGS:-}
+export HOME=/root GIT_TERMINAL_PROMPT=0
+CLONE=/var/lib/homeos/src
+CRED=/etc/homeos/git-credentials
+git_root() {
+    local c=(-c credential.helper= -c core.hooksPath=/dev/null)
+    [ -f "$CRED" ] && c+=(-c "credential.helper=store --file=$CRED")
+    git "${c[@]}" "$@"
+}
+status=0
+install -d -m 0755 -o root -g root /var/lib/homeos
+if [ -d "$CLONE/.git" ] && [ "$(stat -c %u "$CLONE")" -eq 0 ]; then
+    git_root -C "$CLONE" remote set-url origin "$HOMEOS_REMOTE" \
+        && git_root -C "$CLONE" fetch --depth 50 origin "refs/heads/$HOMEOS_BRANCH" \
+        && git_root -C "$CLONE" reset --hard FETCH_HEAD \
+        && git_root -C "$CLONE" clean -fdxq || status=$?
+else
+    NEW=$(mktemp -d /var/lib/homeos/src.XXXXXX)
+    if git_root clone --depth 50 --branch "$HOMEOS_BRANCH" --single-branch "$HOMEOS_REMOTE" "$NEW/src"; then
+        [ -e "$CLONE" ] && mv "$CLONE" "$NEW/old"
+        mv "$NEW/src" "$CLONE"
+        rm -rf "$NEW"
+    else
+        status=1
+    fi
+fi
+if [ "$status" -eq 0 ]; then
+    chown -R root:root "$CLONE"
+    chmod -R go-w "$CLONE"
+    HOMEOS_USER="$HOMEOS_OWNER" "$CLONE/install.sh" --no-packages $HOMEOS_FLAGS || status=$?
+fi
+echo "HOMEOS_UPDATE_EXIT=$status"
