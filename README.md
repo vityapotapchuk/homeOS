@@ -6,11 +6,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/vityapotapchuk/homeos/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/vityapotapchuk/homeos?label=release&color=4c8bf5"></a>
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/vityapotapchuk/homeos?color=4c8bf5"></a>
-  <a href="https://github.com/vityapotapchuk/homeos/actions/workflows/check.yml"><img alt="Checks" src="https://github.com/vityapotapchuk/homeos/actions/workflows/check.yml/badge.svg"></a>
+  <img alt="Version 0.18.2" src="https://img.shields.io/badge/version-0.18.2-4c8bf5">
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-4c8bf5"></a>
   <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
-  <img alt="Python 3, no dependencies" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
+  <img alt="Python 3, standard library only" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
 </p>
 
 <p align="center">
@@ -44,7 +43,8 @@ Expressive styling, light and dark themes and smooth animations.
 ### Option 1 — a ready SD card image
 
 1. Download the image for your Pi from the
-   [latest release](https://github.com/vityapotapchuk/homeos/releases/latest):
+   [Releases page](https://github.com/vityapotapchuk/homeos/releases)
+   (no release yet? use Option 2 below):
    - `homeos-pi5-*.img.xz` — Raspberry Pi 5, full edition (desktop on the screen, web access, browser, camera)
    - `homeos-zero2w-*.img.xz` — Raspberry Pi Zero 2 W, lite edition (web access only)
 2. Write it with [Raspberry Pi Imager](https://www.raspberrypi.com/software/) → *Choose OS* →
