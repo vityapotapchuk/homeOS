@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.20.1" src="https://img.shields.io/badge/version-0.20.1-4c8bf5">
+  <img alt="Version 0.20.2" src="https://img.shields.io/badge/version-0.20.2-4c8bf5">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-4c8bf5"></a>
   <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
   <img alt="Python 3, standard library only" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
@@ -181,6 +181,9 @@ From the console instead: `python3 /opt/homeos/shell/printer.py <printer-ip> <ac
   encoder (`ffmpeg`) runs only while someone listens.
 - **Motion detection** — HomeOS shows events and clips from a detection service on port
   8084 if one is running. The service itself is not part of this repository.
+  The Motion switch starts and stops the `homeos-detect` service. If another program
+  holds port 8084 while that service is off, the Motion tile shows *Blocked* and the
+  Camera app explains why, instead of quietly showing Off while detection carries on.
 
 ## Project layout
 

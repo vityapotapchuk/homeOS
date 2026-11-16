@@ -479,11 +479,12 @@ async function detRefresh(force) {
   let r;
   try { r = await api("/api/detect/state"); } catch (e) { return; }
   $("det-record").hidden = $("det-view").hidden = !r.ok;
-  motionShow(r.service);
+  motionShow(r.service, r.other);
   const chip = $("cam-chip");
   if (!r.ok) {
     chip.hidden = true;
-    $("det-state").textContent = r.service === "not installed"
+    $("det-state").textContent = r.other ? r.error
+      : r.service === "not installed"
       ? "Motion detection is not installed on this Pi, so there are no events or clips. It is a separate service on port 8084."
       : r.service === "active" || r.service === "activating" ? "Motion detection is starting…"
       : r.service === "deactivating" ? "Motion detection is stopping…"
@@ -538,9 +539,10 @@ async function loadClips() {
    was asked for ("Starting…", "Stopping…") and the real state is polled until it settles. */
 let motionWant = null;        // {on, until} while a switch is in progress
 let motionLast = "";          // the service state seen last
+let motionOther = false;      // another program runs the detector, so this switch cannot stop it
 const MOTION_WAIT = 20000;
-function motionShow(service) {
-  if (service !== undefined) motionLast = service || "";
+function motionShow(service, other) {
+  if (service !== undefined) { motionLast = service || ""; motionOther = !!other; }
   const s = motionLast;
   const installed = !!s && s !== "not installed";
   let on = s === "active" || s === "activating" || s === "reloading";
@@ -561,10 +563,11 @@ function motionShow(service) {
       motionWant = null;
     }
   }
+  if (motionOther && !motionWant) text = "Blocked";
   const tile = $("d-motion");
   tile.hidden = isLite() || !installed;
   tile.setAttribute("aria-pressed", String(on));
-  tile.classList.toggle("failed", s === "failed" && !motionWant);
+  tile.classList.toggle("failed", (s === "failed" || motionOther) && !motionWant);
   $("d-motion-text").textContent = text;
   $("det-power").setAttribute("aria-pressed", String(on));
   $("det-power").title = "Motion detection: " + text;
@@ -573,11 +576,15 @@ let motionPoll = 0;
 async function motionPollOnce() {
   let r = null;
   try { r = await api("/api/detect/state"); } catch (e) { /* try again */ }
-  if (r) motionShow(r.service);
+  if (r) motionShow(r.service, r.other);
   if (motionWant) motionPoll = setTimeout(motionPollOnce, 1500);
   else if (!$("app-camera").hidden) detRefresh(true);
 }
 async function motionToggle() {
+  if (motionOther && !motionWant) {
+    toast("Another program is running motion detection, so this switch cannot stop it. Stop that program, then try again.");
+    return;
+  }
   const on = $("d-motion").getAttribute("aria-pressed") !== "true" && $("det-power").getAttribute("aria-pressed") !== "true";
   const want = motionWant ? !motionWant.on : on;
   for (const b of [$("d-motion"), $("det-power")]) b.disabled = true;
@@ -916,7 +923,7 @@ async function cameraWidget() {
   if (!widgetOn("camera")) {
     // the Motion tile works without the camera widget
     box.hidden = true; grid.classList.add("no-cam");
-    try { motionShow((await api("/api/detect/state")).service); } catch (e) { /* keep it */ }
+    try { const r = await api("/api/detect/state"); motionShow(r.service, r.other); } catch (e) { /* keep it */ }
     return;
   }
   const img = new Image();
@@ -925,7 +932,7 @@ async function cameraWidget() {
   img.src = streamUrl("/api/camera/capture");
   let r = null;
   try { r = await api("/api/detect/state"); } catch (e) { /* keep the old text */ }
-  if (r) motionShow(r.service);
+  if (r) motionShow(r.service, r.other);
   if (!r) return;
   const last = r.ok && r.events.find((e) => e.type !== "clear");
   $("d-cam-live").textContent = r.ok && r.seen.length ? "In view: " + r.seen.join(", ") : "Camera";

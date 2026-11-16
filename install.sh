@@ -357,6 +357,18 @@ for pid in $(pgrep -u "$TARGET_USER" node 2>/dev/null); do
         "$OLD_HOME/radio-server"*) say "Stopping the old radio program (pid $pid)"; kill "$pid" 2>/dev/null || true ;;
     esac
 done
+# An earlier user service of the esp32cam project ran the same detector on port
+# 8084. While it runs, homeos-detect cannot start and the Motion switch has no
+# effect (clips and Telegram alerts keep coming). The Motion switch owns it now.
+if [ -f /etc/systemd/system/homeos-detect.service ]; then
+    for old in esp32cam-detect.service; do
+        if [ -f "$OLD_HOME/.config/systemd/user/$old" ]; then
+            say "Switching off the old detector (user service $old); the Motion switch controls detection now"
+            systemctl --user -M "$TARGET_USER@" disable --now "$old" >/dev/null 2>&1 || true
+            rm -f "$OLD_HOME"/.config/systemd/user/*.wants/"$old"
+        fi
+    done
+fi
 RADIO_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 cat > /etc/systemd/system/homeos-radio.service <<UNIT
 [Unit]

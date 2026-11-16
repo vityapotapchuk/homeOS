@@ -12,6 +12,7 @@ import os
 import queue
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import time
@@ -527,8 +528,25 @@ def detect_power(on):
     return {"ok": True, "on": bool(on)}
 
 
+DETECT_OTHER = ("Another program is running motion detection on this Pi (port 8084), so the Motion "
+                "switch cannot stop it. Stop that program, then try again.")
+
+
+def _port_busy(base, timeout=0.3):
+    """True when something listens at the detector's address (a quick connect, no HTTP)."""
+    u = urllib.parse.urlsplit(base)
+    try:
+        with socket.create_connection((u.hostname or "127.0.0.1", u.port or 80), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def detect_state(base):
     service = detect_service()
+    if service in ("inactive", "failed") and _port_busy(base):
+        # the Motion service is off, yet a detector answers: it is not ours to switch
+        return {"ok": False, "error": DETECT_OTHER, "service": service, "other": True}
     try:
         if service not in ("active", "not installed"):
             raise OSError("switched off")       # do not wait for a service that is stopped

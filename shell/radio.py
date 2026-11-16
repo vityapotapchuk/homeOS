@@ -379,8 +379,7 @@ def _public_url(url):
 
 
 def ytdlp_path():
-    for c in (shutil.which("yt-dlp"), os.path.expanduser("~/.local/bin/yt-dlp"), os.path.expanduser("~/bin/yt-dlp"),
-              "/home/server/bin/yt-dlp"):
+    for c in (shutil.which("yt-dlp"), os.path.expanduser("~/.local/bin/yt-dlp"), os.path.expanduser("~/bin/yt-dlp")):
         if c and os.access(c, os.X_OK):
             return c
     return None
