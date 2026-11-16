@@ -4,7 +4,7 @@ Thank you for helping! Bug reports, ideas and pull requests are all welcome.
 
 ## Reporting a bug
 
-Open an [issue](https://github.com/vityapotapchuk/homeos/issues/new/choose) and include:
+Open an [issue](https://github.com/vityapotapchuk/HomeOS/issues/new/choose) and include:
 
 - the HomeOS version (Settings → About) and your Pi model;
 - whether you use the Pi's screen, web access, or both, and which browser;
@@ -18,7 +18,7 @@ Security problems: please do **not** open a public issue — see [SECURITY.md](S
 There is nothing to build. To try a change on a Pi:
 
 ```sh
-git clone https://github.com/vityapotapchuk/homeos.git ~/homeos-src
+git clone https://github.com/vityapotapchuk/HomeOS.git ~/homeos-src
 cd ~/homeos-src
 sudo ./install.sh --web --no-packages   # copies the files to /opt/homeos and restarts the services
 ```

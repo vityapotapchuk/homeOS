@@ -6,7 +6,7 @@ taken seriously.
 ## Reporting a vulnerability
 
 Please report privately through GitHub:
-**[Report a vulnerability](https://github.com/vityapotapchuk/homeos/security/advisories/new)**
+**[Report a vulnerability](https://github.com/vityapotapchuk/HomeOS/security/advisories/new)**
 (Security tab → *Report a vulnerability*). Do not open a public issue.
 
 Include the HomeOS version, what an attacker could do, and steps to reproduce. You will get

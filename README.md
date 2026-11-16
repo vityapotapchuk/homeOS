@@ -43,7 +43,7 @@ Expressive styling, light and dark themes and smooth animations.
 ### Option 1 — a ready SD card image
 
 1. Download the image for your Pi from the
-   [Releases page](https://github.com/vityapotapchuk/homeos/releases)
+   [Releases page](https://github.com/vityapotapchuk/HomeOS/releases)
    (no release yet? use Option 2 below):
    - `homeos-pi5-*.img.xz` — Raspberry Pi 5, full edition (desktop on the screen, web access, browser, camera)
    - `homeos-zero2w-*.img.xz` — Raspberry Pi Zero 2 W, lite edition (web access only)
@@ -59,7 +59,7 @@ Expressive styling, light and dark themes and smooth animations.
 
 ```sh
 sudo apt install -y git
-git clone https://github.com/vityapotapchuk/homeos.git ~/homeos-src
+git clone https://github.com/vityapotapchuk/HomeOS.git ~/homeos-src
 cd ~/homeos-src
 sudo ./install.sh --web
 sudo reboot
