@@ -26,7 +26,7 @@ jobs:
       - name: Shell scripts parse
         run: |
           bash -n install.sh uninstall.sh image/*.sh
-          for f in bin/*; do sh -n "$f"; done
+          for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; else sh -n "$f"; fi; done
       - name: Tests
         run: python -m unittest discover -s tests -t . -v
       - name: No secrets committed

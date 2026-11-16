@@ -38,7 +38,7 @@ Guidelines:
   python3 -m unittest discover -s tests -t .
   python3 -m py_compile shell/*.py
   node --check shell/ui/*.js
-  bash -n install.sh uninstall.sh image/*.sh && for f in bin/*; do sh -n "$f"; done
+  bash -n install.sh uninstall.sh image/*.sh && for f in bin/*; do if head -1 "$f" | grep -q bash; then bash -n "$f"; else sh -n "$f"; fi; done
   ```
 
 ## Pull requests
