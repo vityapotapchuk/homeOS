@@ -1849,25 +1849,40 @@ body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: 
   .dash-grid.fit #w-site.has-hero .d-site-text b { font-size: 13px; line-height: 16px; -webkit-line-clamp: 2; }
 }
 
-/* Printer card while nothing prints: a pixel printer instead of the ring, big temperatures */
-.d-pixel { display: none; flex: none; width: 92px; aspect-ratio: 22 / 18; image-rendering: pixelated; }
+/* Printer card: the pixel printer is always there. While printing, the part in it grows with
+   the progress and the percentage sits on it; while idle the temperatures are big. */
+.d-pixel { position: relative; display: block; flex: none; width: clamp(96px, 30%, 170px); aspect-ratio: 22 / 18; image-rendering: pixelated; }
 .d-pixel svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); }
-#w-printer.idle .d-ring { display: none; }
-#w-printer.idle .d-pixel { display: block; animation: px-bob 3.6s ease-in-out infinite; }
-#w-printer.idle .px-N { fill: #18202c; }
+#w-printer .d-ring { display: none; }
+#w-printer.idle .d-pixel { animation: px-bob 3.6s ease-in-out infinite; }
+#w-printer .px-N { fill: #18202c; transition: fill 0.4s; }
+#w-printer .px-N.shown { fill: #3ddc84; }
 #w-printer .px-L { animation: px-led 2.4s steps(1) infinite; }
+#w-printer.px-printing .px-L { animation-duration: 0.8s; }
+#w-printer.px-printing .px-T { animation: px-head 2.2s ease-in-out infinite alternate; }
 #w-printer.hot .px-O { fill: #ffb05c; filter: drop-shadow(0 0 1px #ff8a3d); }
+#w-printer.px-offline .d-pixel svg { filter: grayscale(1) brightness(0.75); }
+#w-printer.px-offline .px-L { animation: none; fill: #6b3030; }
+.px-pct { position: absolute; right: -10px; top: -10px; padding: 2px 8px; border-radius: 999px;
+  font-size: 14px; line-height: 18px; font-weight: 800; color: #062b14; background: #3ddc84; font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+.px-pct:empty { display: none; }
+.px-bar { position: absolute; left: 12%; right: 22%; bottom: -8px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.px-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: #3ddc84; transition: width 0.6s; }
+#w-printer:not(.px-printing) .px-bar { display: none; }
 @keyframes px-bob { 50% { transform: translateY(-3px); } }
 @keyframes px-led { 50% { fill: #2a6b3d; } }
+@keyframes px-head { to { transform: translateX(1.5px); } }
 #w-printer.idle .d-printer-temps { margin-top: 10px; }
 #w-printer.idle .d-printer-temps > span { padding: 8px 14px; border-radius: 14px; flex-direction: column; align-items: flex-start; gap: 0; }
 #w-printer.idle .d-printer-temps b { font-size: 22px; line-height: 26px; }
 @media (max-width: 760px) {
-  .dash-grid.fit .d-pixel { width: 60px; }
+  .dash-grid.fit .d-pixel { width: 64px; }
+  .dash-grid.fit .px-pct { font-size: 11px; line-height: 14px; padding: 1px 6px; right: -8px; top: -8px; }
   .dash-grid.fit #w-printer.idle .d-printer-temps > span { padding: 3px 9px; flex-direction: row; align-items: baseline; gap: 6px; }
   .dash-grid.fit #w-printer.idle .d-printer-temps b { font-size: 15px; line-height: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { #w-printer .d-pixel, #w-printer .px-L { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #w-printer .d-pixel, #w-printer .px-L, #w-printer .px-T { animation: none; } }
 /* weather text stays readable over the moving sky */
 .d-weather .w-head, .d-weather-foot { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35); }
 .d-weather-foot > div:first-child { flex: 1 1 auto; min-width: 0; }

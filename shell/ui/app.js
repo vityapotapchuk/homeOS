@@ -1238,16 +1238,28 @@ function pixelPrinter() {
   const w = PIXEL_PRINTER[0].length, h = PIXEL_PRINTER.length;
   let rects = "";
   PIXEL_PRINTER.forEach((row, y) => [...row].forEach((c, x) => {
-    if (PIXEL_COLOURS[c]) rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${PIXEL_COLOURS[c]}" class="px-${c}"/>`;
+    if (PIXEL_COLOURS[c]) rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${PIXEL_COLOURS[c]}" class="px-${c}" data-y="${y}"/>`;
   }));
   return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
 (() => {
   const ring = $("w-printer-ring"), px = document.createElement("span");
   px.className = "d-pixel";
-  px.innerHTML = pixelPrinter();
+  px.innerHTML = pixelPrinter() + "<b class='px-pct' id='w-printer-pxpct'></b><i class='px-bar'><i id='w-printer-pxbar'></i></i>";
   ring.after(px);
 })();
+/* the pixel printer shows the job too: the part grows layer by layer with the progress */
+function pixelProgress(w, pct, online) {
+  const printing = pct >= 0;
+  w.classList.toggle("px-offline", !online);
+  w.classList.toggle("px-printing", printing);
+  $("w-printer-pxpct").textContent = printing ? Math.round(pct) + "%" : "";
+  $("w-printer-pxbar").style.width = (printing ? Math.max(2, pct) : 0) + "%";
+  const part = w.querySelectorAll(".d-pixel .px-N");
+  const ys = [...part].map((r) => +r.dataset.y), top = Math.min(...ys), bottom = Math.max(...ys);
+  const rows = printing ? Math.ceil(((bottom - top + 1) * pct) / 100) : 0;
+  for (const r of part) r.classList.toggle("shown", bottom - +r.dataset.y < rows);
+}
 function printerWidgetsShow(r) {
   const w = $("w-printer");
   const pic = w.querySelector(".d-art .model"), m = r.model || {};
@@ -1261,6 +1273,7 @@ function printerWidgetsShow(r) {
     $("w-printer-file").textContent = "Bambu Lab printer";
     $("w-printer-sub").textContent = "Tap to connect it";
     w.classList.add("idle");
+    pixelProgress(w, -1, false);
     $("w-printer-pct").textContent = "+";
     $("w-printer-ring").style.setProperty("--p", 0);
     return;
@@ -1276,6 +1289,7 @@ function printerWidgetsShow(r) {
   const pct = busy || r.state === "FINISH" ? r.percent : 0;
   $("w-printer-pct").textContent = busy || r.state === "FINISH" ? pct + "%" : r.online ? "✓" : "–";
   $("w-printer-ring").style.setProperty("--p", pct);
+  pixelProgress(w, busy || r.state === "FINISH" ? pct : -1, r.online);
   // temperatures in the same card; warm colours while hot
   $("w-printer-noz").textContent = prTemp(r.nozzle);
   $("w-printer-bed").textContent = prTemp(r.bed);

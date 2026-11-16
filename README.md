@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.19.1" src="https://img.shields.io/badge/version-0.19.1-4c8bf5">
+  <img alt="Version 0.19.2" src="https://img.shields.io/badge/version-0.19.2-4c8bf5">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-4c8bf5"></a>
   <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
   <img alt="Python 3, standard library only" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
