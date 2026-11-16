@@ -322,6 +322,9 @@ if [ -d /etc/sudoers.d ] && command -v visudo >/dev/null 2>&1; then
         for verb in enable disable; do
             echo "$TARGET_USER ALL=(root) NOPASSWD: $ctl $verb --now homeos-detect.service" >> "$RULE"
         done
+        # the Radio app may (re)start its own service and switch the old radio server off
+        echo "$TARGET_USER ALL=(root) NOPASSWD: $ctl restart homeos-radio.service" >> "$RULE"
+        echo "$TARGET_USER ALL=(root) NOPASSWD: $ctl disable --now radio-server.service" >> "$RULE"
     done
     if visudo -cf "$RULE" >/dev/null 2>&1; then
         install -m 0440 -o root -g root "$RULE" /etc/sudoers.d/homeos-update
@@ -341,6 +344,18 @@ for old in radio-server.service; do
         say "Switching off the old radio server ($old); HomeOS Radio takes over its playlist"
         systemctl disable --now "$old" >/dev/null 2>&1 || true
     fi
+    # it may also run as a service of the user (systemctl --user)
+    if [ -f "$(getent passwd "$TARGET_USER" | cut -d: -f6)/.config/systemd/user/$old" ]; then
+        say "Switching off the old radio server (user service $old)"
+        systemctl --user -M "$TARGET_USER@" disable --now "$old" >/dev/null 2>&1 || true
+    fi
+done
+# and any program of the user's old radio still holding port 8081
+OLD_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+for pid in $(pgrep -u "$TARGET_USER" node 2>/dev/null); do
+    case "$(readlink "/proc/$pid/cwd" 2>/dev/null)" in
+        "$OLD_HOME/radio-server"*) say "Stopping the old radio program (pid $pid)"; kill "$pid" 2>/dev/null || true ;;
+    esac
 done
 RADIO_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 cat > /etc/systemd/system/homeos-radio.service <<UNIT

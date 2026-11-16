@@ -680,7 +680,13 @@ async function stationRefresh(np) {
   try { r = await api("/api/radio/tracks"); } catch (e) { return; }
   const card = $("rs-card");
   card.classList.toggle("off", !r.ok);
-  if (!r.ok) { $("rs-sum").textContent = r.error; $("rs-list").textContent = ""; return; }
+  $("rs-diag").hidden = r.ok;
+  if (!r.ok) {
+    $("rs-sum").textContent = "The station is not answering";
+    $("rs-list").textContent = "";
+    stationDiagnose();
+    return;
+  }
   stationTracks = r.tracks;
   const ready = r.tracks.filter((t) => t.status === "ready" && t.visible);
   const total = ready.reduce((s, t) => s + (t.duration || 0), 0);
@@ -694,6 +700,31 @@ async function stationRefresh(np) {
   r.tracks.forEach((t, i) => list.appendChild(trackRow(t, i, nowId)));
   if (r.tracks.some((t) => t.status === "pending")) setTimeout(() => !$("app-radio").hidden && stationRefresh(np), 3000);
 }
+/* when the station does not answer: say why, and offer the fix */
+let diagBusy = false;
+async function stationDiagnose() {
+  if (diagBusy) return;
+  diagBusy = true;
+  try {
+    const d = await api("/api/radio/status");
+    $("rs-reason").textContent = d.reason || "The station is starting…";
+    $("rs-stop-old").hidden = !d.old;
+    const o = d.owner;
+    $("rs-log").textContent = [
+      "Service homeos-radio: " + d.service + (d.sub ? " (" + d.sub + ")" : "") + (+d.restarts ? ", restarted " + d.restarts + " times" : ""),
+      "Port " + d.port + ": " + (!o ? "free" : o.ours ? "the HomeOS radio" : o.pid ? "pid " + o.pid + " " + o.cmd + (o.cwd ? " in " + o.cwd : "") : "a program of another user"),
+      "ffmpeg: " + (d.ffmpeg ? "yes" : "missing (sudo apt install ffmpeg)") + " · yt-dlp: " + (d.ytdlp ? "yes" : "missing (sudo apt install yt-dlp)"),
+      "", ...(d.log.length ? d.log : ["(the radio has written nothing yet)"]),
+    ].join("\n");
+    if (d.working) setTimeout(radioRefresh, 300);
+  } catch (e) { $("rs-reason").textContent = e.message; } finally { diagBusy = false; }
+}
+async function stationFix(action, busyText) {
+  const r = await stationCall("/api/radio/fix", { action });
+  if (r && r.ok) { toast(busyText); setTimeout(radioRefresh, 4000); setTimeout(radioRefresh, 9000); }
+}
+$("rs-stop-old").addEventListener("click", () => stationFix("stop-old", "Stopping the old radio; the new one takes the port…"));
+$("rs-start").addEventListener("click", () => stationFix("start", "Starting the radio…"));
 async function stationCall(path, body) {
   try {
     const r = await api(path, body);

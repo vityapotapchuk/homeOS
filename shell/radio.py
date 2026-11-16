@@ -57,8 +57,20 @@ LEGACY_DATA = os.path.expanduser("~/radio-server/data")       # an earlier stand
 FALLBACK_DURATION = 180.0
 
 
+LOG_FILE = None                        # <config>/radio/radio.log, so HomeOS can show what went wrong
+
+
 def log(*a):
-    print("radio:", *a, flush=True)
+    line = " ".join(str(x) for x in a)
+    print("radio:", line, flush=True)
+    if LOG_FILE:
+        try:
+            if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > 256 * 1024:
+                os.replace(LOG_FILE, LOG_FILE + ".1")
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
+        except OSError:
+            pass
 
 
 # --------------------------------------------------------------- the playlist
@@ -382,9 +394,14 @@ class Radio:
         for d in (self.dir, self.uploads, self.incoming):
             os.makedirs(d, exist_ok=True)
         os.chmod(self.dir, 0o700)
+        global LOG_FILE
+        LOG_FILE = os.path.join(self.dir, "radio.log")
         self.token = self._token()
         self.store = Store(os.path.join(self.dir, "radio.db"))
-        self._migrate()
+        try:
+            self._migrate()
+        except Exception as e:                  # a broken old playlist must not keep the radio off the air
+            log("taking over the earlier radio failed: %r" % e)
         self.station = Station(self.store, self.uploads, self.dir)
         self.station.reload()
 
@@ -701,15 +718,16 @@ def rebind(radio):
     if old:
         old.shutdown()
         old.server_close()
-    for _ in range(20):
+    tries = 0
+    while True:
         try:
             srv = Server((host, _servers["port"]), make_handler(radio))
             break
         except OSError as e:
-            log("port %d is busy (%s); trying again" % (_servers["port"], e))
+            if tries % 10 == 0:
+                log("port %d is taken (%s), probably by the old radio server; waiting for it" % (_servers["port"], e.strerror or e))
+            tries += 1
             time.sleep(3)
-    else:
-        raise SystemExit("could not open port %d" % _servers["port"])
     _servers["current"] = srv
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     log("listening on http://%s:%d/" % (host, _servers["port"]))
@@ -723,7 +741,16 @@ def main(argv=None):
     if not shutil.which("ffmpeg"):
         log("ffmpeg is missing: sudo apt install ffmpeg")
     _servers["port"] = a.port
-    radio = Radio(a.config)
+    global LOG_FILE
+    os.makedirs(os.path.join(a.config, "radio"), exist_ok=True)
+    LOG_FILE = os.path.join(a.config, "radio", "radio.log")
+    try:
+        radio = Radio(a.config)
+    except Exception:
+        import traceback
+        log("could not start:\n" + traceback.format_exc())
+        raise
+    log("started (HomeOS radio, port %d)" % a.port)
     rebind(radio)
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())

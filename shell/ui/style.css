@@ -1695,7 +1695,7 @@ body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: 
    Big landscape screens (desktop, large tablet): a large clock on top,
    the widgets below at about 70% of their size, centred.
    ===================================================================== */
-@media (orientation: landscape) and (min-width: 1100px) and (min-height: 640px) {
+@media (orientation: landscape) and (min-width: 1400px) and (min-height: 760px) {
   .status { position: relative; min-height: 28vh; align-items: flex-start; justify-content: flex-end; padding-top: 18px; }
   .status .when { position: absolute; left: 50%; top: 3.2vh; transform: translateX(-50%); align-items: center; text-align: center; gap: 0.6vh; }
   .status .clock { font-size: clamp(72px, 17vh, 220px); line-height: 0.95; font-weight: 600; letter-spacing: -0.04em; }
@@ -1933,3 +1933,11 @@ body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: 
 .rs-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 @media (max-width: 560px) { .rs-tools .round.sm { width: 32px; height: 32px; } .rs-tools .round.sm svg { width: 18px; height: 18px; } .rs-item { gap: 8px; padding-left: 6px; } }
 .rs-card, #app-radio .radio-card { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+.rs-diag { margin: 14px 0 4px; padding: 14px 16px; border-radius: 16px; background: color-mix(in srgb, var(--md-error) 14%, var(--md-surface-container-high)); }
+.rs-reason { margin: 0 0 10px; font-weight: 600; line-height: 1.35; }
+.rs-diag .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.rs-log { margin-top: 10px; }
+.rs-log summary { cursor: pointer; color: var(--md-on-surface-variant); font-size: 13px; }
+.rs-log pre { margin: 8px 0 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.45; }
+.rs-card.off .rs-diag { opacity: 1; pointer-events: auto; }
+#app-radio .app-body { justify-content: flex-start; } #app-radio .radio-card, #app-radio .rs-card { margin: 0 auto; flex: none; }

@@ -283,6 +283,120 @@ def radio_admin(base, method, path, body=None, timeout=10):
         return {"ok": False, "error": RADIO_OFF}
 
 
+# ---- when the station does not answer: what is wrong, and the fixes HomeOS can make
+
+RADIO_UNIT = "homeos-radio.service"
+OLD_RADIO_UNIT = "radio-server.service"
+
+
+def _unit(unit, user=False):
+    cmd = ["systemctl"] + (["--user"] if user else []) + ["show", "-p", "LoadState,ActiveState,SubState,NRestarts", unit]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    return dict(l.split("=", 1) for l in out.splitlines() if "=" in l)
+
+
+def _port_owner(port):
+    """pid, command line and folder of the program listening on a TCP port (own user only)."""
+    inodes = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table) as f:
+                next(f)
+                for line in f:
+                    p = line.split()
+                    if p[3] == "0A" and int(p[1].rsplit(":", 1)[1], 16) == port:
+                        inodes.add(p[9])
+        except (OSError, StopIteration, IndexError, ValueError):
+            pass
+    if not inodes:
+        return None
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            for fd in os.listdir("/proc/%s/fd" % pid):
+                link = os.readlink("/proc/%s/fd/%s" % (pid, fd))
+                if link.startswith("socket:[") and link[8:-1] in inodes:
+                    with open("/proc/%s/cmdline" % pid, "rb") as f:
+                        cmd = f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()
+                    try:
+                        cwd = os.readlink("/proc/%s/cwd" % pid)
+                    except OSError:
+                        cwd = ""
+                    return {"pid": int(pid), "cmd": cmd[:200], "cwd": cwd, "ours": "radio.py" in cmd}
+        except OSError:
+            continue
+    return {"pid": None, "cmd": "", "cwd": "", "ours": False}     # someone else's program
+
+
+def radio_status(base):
+    port = urlparse(base).port or 8081
+    svc = _unit(RADIO_UNIT)
+    old_sys, old_user = _unit(OLD_RADIO_UNIT), _unit(OLD_RADIO_UNIT, user=True)
+    owner = _port_owner(port)
+    admin = radio_admin(base, "GET", "/api/tracks", timeout=4)
+    log = []
+    try:
+        with open(os.path.join(_radio_dir(), "radio.log"), encoding="utf-8", errors="replace") as f:
+            log = f.read()[-3000:].splitlines()[-12:]
+    except OSError:
+        pass
+    old_running = old_sys.get("ActiveState") == "active" or old_user.get("ActiveState") == "active" \
+        or bool(owner and not owner["ours"])
+    if admin.get("ok"):
+        reason = ""
+    elif old_running:
+        reason = "The old radio server still holds port %d, so the new one cannot start. Stop the old one." % port
+    elif svc.get("LoadState") != "loaded":
+        reason = "The radio service is not installed yet. Install the latest HomeOS update."
+    elif svc.get("ActiveState") != "active":
+        reason = "The radio service is %s." % (svc.get("SubState") or svc.get("ActiveState") or "stopped")
+    elif not _radio_token():
+        reason = "The radio's key is missing; restart the radio."
+    else:
+        reason = admin.get("error") or RADIO_OFF
+    return {"ok": True, "working": bool(admin.get("ok")), "reason": reason,
+            "service": svc.get("ActiveState", "unknown"), "sub": svc.get("SubState", ""),
+            "restarts": svc.get("NRestarts", "0"), "old": old_running,
+            "port": port, "owner": owner, "log": log,
+            "ffmpeg": bool(shutil.which("ffmpeg")), "ytdlp": bool(shutil.which("yt-dlp"))}
+
+
+def radio_fix(base, action):
+    """stop-old: the old radio server of this user goes (its service and the program on the port);
+    start: (re)starts the HomeOS radio service (install.sh allows this one sudo command)."""
+    port = urlparse(base).port or 8081
+    if action == "stop-old":
+        for cmd in (["systemctl", "--user", "disable", "--now", OLD_RADIO_UNIT],
+                    ["sudo", "-n", shutil.which("systemctl") or "/usr/bin/systemctl", "disable", "--now", OLD_RADIO_UNIT]):
+            try:
+                subprocess.run(cmd, capture_output=True, timeout=20)
+            except (OSError, subprocess.SubprocessError):
+                pass
+        owner = _port_owner(port)
+        if owner and owner["pid"] and not owner["ours"]:
+            try:
+                os.kill(owner["pid"], 15)
+            except OSError as e:
+                return {"ok": False, "error": "Could not stop the program on port %d (%s)." % (port, e.strerror)}
+        elif owner and not owner["pid"]:
+            return {"ok": False, "error": "Port %d belongs to a program of another user. Stop it from the console: "
+                                          "sudo systemctl disable --now %s" % (port, OLD_RADIO_UNIT)}
+        return {"ok": True}
+    if action == "start":
+        ctl = shutil.which("systemctl") or "/usr/bin/systemctl"
+        try:
+            p = subprocess.run(["sudo", "-n", ctl, "restart", RADIO_UNIT], capture_output=True, text=True, timeout=25)
+        except (OSError, subprocess.SubprocessError):
+            return {"ok": False, "error": "Could not start the radio."}
+        if p.returncode != 0:
+            return {"ok": False, "error": "Starting the radio from here is not allowed yet; install the latest update. "
+                                          + (p.stderr or "").strip()[-160:]}
+        return {"ok": True}
+    return {"ok": False, "error": "Unknown action."}
+
+
 AUDIO_UPLOAD = (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".opus")
 
 
@@ -812,6 +926,8 @@ def api_get(path, settings):
         return radio_now(cfg["radio"])
     if path == "/api/radio/tracks":
         return radio_admin(cfg["radio"], "GET", "/api/tracks")
+    if path == "/api/radio/status":
+        return radio_status(cfg["radio"])
     if path == "/api/camera/settings":
         return camera_settings(cfg["camera"])
     if path == "/api/detect/state":
@@ -854,6 +970,8 @@ def api_post(path, body, settings):
             return radio_admin(base, "DELETE", "/api/tracks/%d" % int(body.get("id", 0)))
         if path == "/api/radio/restart":
             return radio_admin(base, "POST", "/api/server/restart")
+        if path == "/api/radio/fix":
+            return radio_fix(base, str(body.get("action")))
         if path == "/api/radio/public":
             return radio_admin(base, "POST", "/api/server/public", {"on": body.get("on") is True})
     if path == "/api/camera/control":

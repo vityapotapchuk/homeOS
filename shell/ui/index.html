@@ -383,6 +383,14 @@
         <button class="btn" id="rs-upload"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-upload"/></svg>Upload</button>
         <input type="file" id="rs-file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac,.opus" multiple hidden>
       </div>
+      <div class="rs-diag" id="rs-diag" hidden>
+        <p class="rs-reason" id="rs-reason"></p>
+        <div class="row" id="rs-fixes">
+          <button class="btn" id="rs-stop-old" hidden>Stop the old radio</button>
+          <button class="btn tonal" id="rs-start">Start the radio</button>
+        </div>
+        <details class="rs-log"><summary>Details</summary><pre id="rs-log"></pre></details>
+      </div>
       <form class="rs-url" id="rs-url-form" autocomplete="off">
         <input type="url" id="rs-url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="Add from a link (YouTube, SoundCloud, Bandcamp…)">
         <button class="btn tonal" type="submit">Add</button>

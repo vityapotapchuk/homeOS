@@ -89,6 +89,7 @@ class RadioTests(unittest.TestCase):
         old = self.r.LEGACY_DATA
         os.makedirs(os.path.join(old, "uploads"))
         db = sqlite3.connect(os.path.join(old, "radio.db"))
+        db.execute("PRAGMA journal_mode = WAL")          # as the old server kept it
         db.execute(self.r.SCHEMA)
         for i, (title, vis, status) in enumerate((("First", 1, "ready"), ("Hidden", 0, "ready"), ("Broken", 1, "failed"))):
             fn = "f%d.mp3" % i
@@ -96,8 +97,7 @@ class RadioTests(unittest.TestCase):
                 f.write(b"ID3" + b"\0" * 100)
             db.execute("INSERT INTO tracks (title, filename, status, duration, position, visible) VALUES (?,?,?,?,?,?)",
                        (title, fn, status, 100 + i, i, vis))
-        db.commit()
-        db.close()
+        db.commit()                                       # left open: the old server may still hold it
         radio = self.r.Radio(self.cfg)
         tracks = radio.store.all()
         self.assertEqual([(t["title"], t["visible"]) for t in tracks], [("First", True), ("Hidden", False)])
@@ -107,6 +107,14 @@ class RadioTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(old, "uploads", "f0.mp3")), "the old files stay")
         radio2 = self.r.Radio(self.cfg)
         self.assertEqual(len(radio2.store.all()), 2, "taken over twice")
+        db.close()
+
+    def test_a_broken_old_playlist_does_not_stop_the_radio(self):
+        os.makedirs(self.r.LEGACY_DATA)
+        with open(os.path.join(self.r.LEGACY_DATA, "radio.db"), "wb") as f:
+            f.write(b"this is not a database")
+        radio = self.r.Radio(self.cfg)
+        self.assertEqual(radio.store.all(), [])
 
     # ---- the HTTP service
     def start(self):
