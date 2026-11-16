@@ -479,13 +479,15 @@ async function detRefresh(force) {
   let r;
   try { r = await api("/api/detect/state"); } catch (e) { return; }
   $("det-record").hidden = $("det-view").hidden = !r.ok;
-  if (Date.now() > detPowerHold) $("det-power").setAttribute("aria-pressed", String(r.service === "active"));
+  motionShow(r.service);
   const chip = $("cam-chip");
   if (!r.ok) {
     chip.hidden = true;
     $("det-state").textContent = r.service === "not installed"
       ? "Motion detection is not installed on this Pi, so there are no events or clips. It is a separate service on port 8084."
-      : r.service === "active" ? "Motion detection is starting…"
+      : r.service === "active" || r.service === "activating" ? "Motion detection is starting…"
+      : r.service === "deactivating" ? "Motion detection is stopping…"
+      : r.service === "failed" ? "Motion detection could not start. Try the Motion button again; Monitor shows the service."
       : "Motion detection is switched off. Turn it on with the Motion button.";
     $("det-events").textContent = "";
     $("det-clips").textContent = "";
@@ -531,20 +533,65 @@ async function loadClips() {
     list.appendChild(li);
   }
 }
-/* the Motion button switches the detection service on and off */
-let detPowerHold = 0;       // while the service changes state, the button keeps what was just chosen
-$("det-power").addEventListener("click", async () => {
-  const btn = $("det-power"), on = btn.getAttribute("aria-pressed") !== "true";
-  btn.disabled = true;
+/* ---------- the Motion switch: the tile on Home and the button in Camera are one switch.
+   The detection service can take a few seconds to start or stop; meanwhile both show what
+   was asked for ("Starting…", "Stopping…") and the real state is polled until it settles. */
+let motionWant = null;        // {on, until} while a switch is in progress
+let motionLast = "";          // the service state seen last
+const MOTION_WAIT = 20000;
+function motionShow(service) {
+  if (service !== undefined) motionLast = service || "";
+  const s = motionLast;
+  const installed = !!s && s !== "not installed";
+  let on = s === "active" || s === "activating" || s === "reloading";
+  let text = { active: "Watching", activating: "Starting…", reloading: "Starting…", deactivating: "Stopping…",
+               failed: "Did not start" }[s] || "Off";
+  if (motionWant) {
+    const settled = motionWant.on ? s === "active" : (s === "inactive" || s === "failed");
+    if (motionWant.on && s === "failed") {
+      toast("Motion detection did not start. Monitor shows the service; try again in a moment.");
+      motionWant = null;
+    } else if (settled) {
+      motionWant = null;
+    } else if (Date.now() < motionWant.until) {
+      on = motionWant.on;
+      text = on ? "Starting…" : "Stopping…";
+    } else {
+      if (motionWant.on) toast("Motion detection did not start (" + (s || "no answer") + "). Monitor shows the service.");
+      motionWant = null;
+    }
+  }
+  const tile = $("d-motion");
+  tile.hidden = isLite() || !installed;
+  tile.setAttribute("aria-pressed", String(on));
+  tile.classList.toggle("failed", s === "failed" && !motionWant);
+  $("d-motion-text").textContent = text;
+  $("det-power").setAttribute("aria-pressed", String(on));
+  $("det-power").title = "Motion detection: " + text;
+}
+let motionPoll = 0;
+async function motionPollOnce() {
+  let r = null;
+  try { r = await api("/api/detect/state"); } catch (e) { /* try again */ }
+  if (r) motionShow(r.service);
+  if (motionWant) motionPoll = setTimeout(motionPollOnce, 1500);
+  else if (!$("app-camera").hidden) detRefresh(true);
+}
+async function motionToggle() {
+  const on = $("d-motion").getAttribute("aria-pressed") !== "true" && $("det-power").getAttribute("aria-pressed") !== "true";
+  const want = motionWant ? !motionWant.on : on;
+  for (const b of [$("d-motion"), $("det-power")]) b.disabled = true;
   try {
-    const r = await api("/api/detect/power", { on });
+    const r = await api("/api/detect/power", { on: want });
     if (!r.ok) { toast(r.error); return; }
-    btn.setAttribute("aria-pressed", String(on));
-    detPowerHold = Date.now() + 6000;
-    toast(on ? "Motion detection is starting…" : "Motion detection is off.");
-    setTimeout(() => detRefresh(true), 1500);
-  } catch (e) { toast(e.message); } finally { btn.disabled = false; }
-});
+    motionWant = { on: want, until: Date.now() + MOTION_WAIT };
+    motionShow();
+    toast(want ? "Motion detection is starting…" : "Motion detection is switching off…");
+    clearTimeout(motionPoll);
+    motionPoll = setTimeout(motionPollOnce, 1200);
+  } catch (e) { toast(e.message); } finally { for (const b of [$("d-motion"), $("det-power")]) b.disabled = false; }
+}
+$("det-power").addEventListener("click", motionToggle);
 
 $("det-view").addEventListener("click", () => {
   detView = !detView;
@@ -716,14 +763,20 @@ async function weatherRefresh(force) {
 async function cameraWidget() {
   const box = $("w-camera");
   const grid = $("dash-grid");
-  if (!widgetOn("camera") || isLite()) { box.hidden = true; grid.classList.add("no-cam"); dashMotion(null); return; }
+  if (isLite()) { box.hidden = true; grid.classList.add("no-cam"); motionShow("not installed"); return; }
+  if (!widgetOn("camera")) {
+    // the Motion tile works without the camera widget
+    box.hidden = true; grid.classList.add("no-cam");
+    try { motionShow((await api("/api/detect/state")).service); } catch (e) { /* keep it */ }
+    return;
+  }
   const img = new Image();
   img.onload = () => { $("w-camera-img").src = img.src; box.hidden = false; grid.classList.remove("no-cam"); };
   img.onerror = () => { box.hidden = true; grid.classList.add("no-cam"); };
   img.src = streamUrl("/api/camera/capture");
   let r = null;
   try { r = await api("/api/detect/state"); } catch (e) { /* keep the old text */ }
-  dashMotion(r);
+  if (r) motionShow(r.service);
   if (!r) return;
   const last = r.ok && r.events.find((e) => e.type !== "clear");
   $("d-cam-live").textContent = r.ok && r.seen.length ? "In view: " + r.seen.join(", ") : "Camera";
@@ -734,23 +787,7 @@ async function cameraWidget() {
 }
 
 /* quick tiles: motion detection on and off, and the Pi's temperature */
-function dashMotion(r) {
-  const tile = $("d-motion");
-  if (isLite() || !r || r.service === "not installed" || r.service === undefined) { tile.hidden = true; return; }
-  tile.hidden = false;
-  const on = r.service === "active";
-  tile.setAttribute("aria-pressed", String(on));
-  $("d-motion-text").textContent = on ? "Watching" : "Off";
-}
-$("d-motion").addEventListener("click", async () => {
-  const tile = $("d-motion"), on = tile.getAttribute("aria-pressed") !== "true";
-  tile.disabled = true;
-  try {
-    const r = await api("/api/detect/power", { on });
-    if (!r.ok) toast(r.error);
-    else { tile.setAttribute("aria-pressed", String(on)); $("d-motion-text").textContent = on ? "Starting…" : "Off"; }
-  } catch (e) { toast(e.message); } finally { tile.disabled = false; }
-});
+$("d-motion").addEventListener("click", motionToggle);
 /* ---------- what sits behind the widgets' content, so they are not plain coloured squares */
 function cardArt(id, html) {
   const card = $(id);

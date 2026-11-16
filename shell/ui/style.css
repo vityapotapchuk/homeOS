@@ -1878,3 +1878,6 @@ body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: 
 .d-weather { container-type: inline-size; }
 @container (max-width: 430px) { .d-weather .w-days { display: none; } }
 #w-site.has-hero .d-site-brand { max-width: calc(100% - 40px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+/* motion detection that did not start */
+.d-motion.failed .d-glow { background: linear-gradient(#5a2a2a, #3a1d1d); box-shadow: none; }
+.d-motion.failed .w-sub { color: #ffb4ab; }

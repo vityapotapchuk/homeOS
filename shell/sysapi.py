@@ -31,7 +31,7 @@ from urllib.parse import parse_qs, quote, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import apps  # noqa: E402
 
-VERSION = "0.19.0"
+VERSION = "0.19.1"
 BACKGROUNDS = ("plain", "aurora", "sunset", "ocean", "forest")
 
 SEARCH_ENGINES = {
