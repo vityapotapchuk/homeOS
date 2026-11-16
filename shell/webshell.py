@@ -337,21 +337,44 @@ class WebShell:
         for t in dead:
             self.terms.close_owner(t)
 
+    def _auth_key(self):
+        """Names the sign-in in force: the password record, or "open" while no password
+        is asked. web.json is read again when it changes (homeos-web --set-password,
+        Settings > Sign-in), so a new password ends every session made with the old one."""
+        try:
+            mt = os.stat(self.cfg.path).st_mtime_ns
+        except OSError:
+            mt = None
+        if mt != getattr(self, "_cfg_mtime", None):
+            fresh = WebConfig(os.path.dirname(self.cfg.path)).data
+            self.cfg.data["password"] = fresh.get("password")
+            self.cfg.data["no_password"] = bool(fresh.get("no_password"))
+            self._cfg_mtime = mt
+        if self.cfg.data.get("no_password"):
+            return "open"
+        rec = self.cfg.data.get("password") or {}
+        return hashlib.sha256(json.dumps(rec, sort_keys=True).encode("utf-8")).hexdigest()
+
     def session(self, token):
         if not token:
             return None
+        key = self._auth_key()
         with self.lock:
             s = self.sessions.get(token)
-            if s and s["exp"] >= time.time():
+            if not s:
+                return None
+            # a session made under an earlier password, or while no password was asked,
+            # ends when a password is (newly) required
+            if s["exp"] >= time.time() and (key == "open" or s.get("key") == key):
                 return s
+            del self.sessions[token]
+        self.terms.close_owner(token)
         return None
 
     def login(self, password):
         """Returns (http status, session token or None)."""
-        fresh = WebConfig(os.path.dirname(self.cfg.path)).data     # picks up --set-password
-        rec = fresh.get("password")
-        self.cfg.data["password"] = rec
-        self.cfg.data["no_password"] = bool(fresh.get("no_password"))
+        self._auth_key()                       # picks up --set-password and Settings > Sign-in
+        rec = self.cfg.data.get("password")
         if self.cfg.data["no_password"]:      # switched off in Settings (for testing): anyone who reaches the Pi gets in
             return 200, self._new_session()
         if not rec:
@@ -371,7 +394,8 @@ class WebShell:
     def _new_session(self):
         token = secrets.token_urlsafe(32)
         with self.lock:
-            self.sessions[token] = {"exp": time.time() + SESSION_TTL, "csrf": secrets.token_urlsafe(24)}
+            self.sessions[token] = {"exp": time.time() + SESSION_TTL, "csrf": secrets.token_urlsafe(24),
+                                    "key": self._auth_key()}
         return token
 
     def logout(self, token):

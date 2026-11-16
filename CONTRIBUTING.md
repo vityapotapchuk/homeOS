@@ -31,9 +31,11 @@ Guidelines:
 - **Security:** anything reachable from the web goes through the session and CSRF checks in
   `shell/webshell.py`; never send secrets (passwords, access codes) back to the browser.
 - **Motion:** respect `prefers-reduced-motion` for new animations.
+- Add a test in `tests/` for anything that guards files, sign-in or updates.
 - Run the same checks as CI before you push:
 
   ```sh
+  python3 -m unittest discover -s tests -t .
   python3 -m py_compile shell/*.py
   node --check shell/ui/*.js
   bash -n install.sh uninstall.sh image/*.sh && for f in bin/*; do sh -n "$f"; done

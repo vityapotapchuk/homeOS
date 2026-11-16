@@ -134,10 +134,17 @@ def rename(rel, name):
 
 def delete(rel):
     try:
-        rel = str(rel or "").strip("/")
+        rel = str(rel or "").replace("\\", "/").strip("/")
+        parts = rel.split("/")
+        # every part must be a real name: no "", "." or "..", so the target is
+        # always one entry inside a folder that is itself inside the home folder
+        if not rel or any(p in ("", ".", "..") for p in parts):
+            raise Refused("Nothing to delete.")
+        name = _name_ok(parts[-1])
+        parent = _resolve("/".join(parts[:-1]))
         # the link itself is removed, never what it points to
-        full = os.path.join(_resolve(os.path.dirname(rel)), os.path.basename(rel))
-        if not rel or full == ROOT or not os.path.lexists(full):
+        full = os.path.join(parent, name)
+        if os.path.normpath(full) != full or not full.startswith(ROOT + os.sep) or not os.path.lexists(full):
             raise Refused("Nothing to delete.")
         if os.path.isdir(full) and not os.path.islink(full):
             shutil.rmtree(full)

@@ -2,10 +2,12 @@
 # Starts a HomeOS update. Run as root, without arguments:  sudo homeos-update
 #
 # install.sh allows the HomeOS user to run exactly this file with sudo and no
-# password, which is what "Install update" in Settings uses. It pulls the git
-# folder HomeOS was installed from and runs its install.sh again, as a
-# separate system job so that it survives the restart of web access.
-# Everything it needs comes from /opt/homeos/source, which only root can write.
+# password, which is what "Install update" in Settings uses. Nothing the user
+# can change is run as root: the remote and branch come from /opt/homeos/source
+# (written by install.sh, only root can change it), the code is fetched by root
+# into /var/lib/homeos/src (owned by root), and install.sh runs from there.
+# The work runs as a separate system job so that it survives the restart of
+# web access.
 set -euo pipefail
 
 SOURCE=/opt/homeos/source
@@ -14,11 +16,13 @@ UNIT=homeos-update
 
 [ "$(id -u)" -eq 0 ] || { echo "Run this with sudo." >&2; exit 1; }
 [ "$#" -eq 0 ] || { echo "homeos-update takes no arguments." >&2; exit 2; }
+[ "$(stat -c %u "$SOURCE")" -eq 0 ] || { echo "$SOURCE must belong to root." >&2; exit 1; }
 
-SRC="" FLAGS="" OWNER=""
+REMOTE="" BRANCH="" FLAGS="" OWNER=""
 while IFS='=' read -r key value; do
     case "$key" in
-        SRC) SRC=$value ;;
+        REMOTE) REMOTE=$value ;;
+        BRANCH) BRANCH=$value ;;
         FLAGS) FLAGS=$value ;;
         OWNER) OWNER=$value ;;
     esac
@@ -31,25 +35,53 @@ for flag in $FLAGS; do
     esac
 done
 id "$OWNER" >/dev/null 2>&1 || { echo "The HomeOS user is not recorded. Run install.sh again." >&2; exit 1; }
-if [ ! -d "$SRC/.git" ] || [ ! -x "$SRC/install.sh" ]; then
-    echo "HomeOS was not installed from a git folder." >&2
-    exit 1
-fi
+case "$REMOTE" in
+    https://*|ssh://*|git@*) ;;
+    *) echo "No update address is recorded. Run install.sh once from the console." >&2; exit 1 ;;
+esac
+printf '%s' "$BRANCH" | grep -Eq '^[A-Za-z0-9._/-]+$' \
+    || { echo "No update branch is recorded. Run install.sh once from the console." >&2; exit 1; }
 
 if systemctl is-active --quiet "$UNIT"; then
     exit 0          # an update is already running
 fi
 
 JOB='
-home=$(getent passwd "$HOMEOS_USER" | cut -d: -f6)
+set -u
+export HOME=/root GIT_TERMINAL_PROMPT=0
+CLONE=/var/lib/homeos/src
+CRED=/etc/homeos/git-credentials
+git_root() {
+    local c=(-c credential.helper= -c core.hooksPath=/dev/null)
+    [ -f "$CRED" ] && c+=(-c "credential.helper=store --file=$CRED")
+    git "${c[@]}" "$@"
+}
 status=0
-runuser -u "$HOMEOS_USER" -- env HOME="$home" git -C "$HOMEOS_SRC" pull --ff-only || status=$?
+install -d -m 0755 -o root -g root /var/lib/homeos
+if [ -d "$CLONE/.git" ] && [ "$(stat -c %u "$CLONE")" -eq 0 ]; then
+    git_root -C "$CLONE" remote set-url origin "$HOMEOS_REMOTE" \
+        && git_root -C "$CLONE" fetch --depth 50 origin "refs/heads/$HOMEOS_BRANCH" \
+        && git_root -C "$CLONE" reset --hard FETCH_HEAD \
+        && git_root -C "$CLONE" clean -fdxq || status=$?
+else
+    NEW=$(mktemp -d /var/lib/homeos/src.XXXXXX)
+    if git_root clone --depth 50 --branch "$HOMEOS_BRANCH" --single-branch "$HOMEOS_REMOTE" "$NEW/src"; then
+        [ -e "$CLONE" ] && mv "$CLONE" "$NEW/old"
+        mv "$NEW/src" "$CLONE"
+        rm -rf "$NEW"
+    else
+        status=1
+    fi
+fi
 if [ "$status" -eq 0 ]; then
-    "$HOMEOS_SRC/install.sh" --no-packages $HOMEOS_FLAGS || status=$?
+    chown -R root:root "$CLONE"
+    chmod -R go-w "$CLONE"
+    HOMEOS_USER="$HOMEOS_OWNER" "$CLONE/install.sh" --no-packages $HOMEOS_FLAGS || status=$?
 fi
 echo "HOMEOS_UPDATE_EXIT=$status"
 '
 exec systemd-run --unit "$UNIT" --collect --quiet \
-    --setenv=HOMEOS_USER="$OWNER" --setenv=HOMEOS_SRC="$SRC" --setenv=HOMEOS_FLAGS="$FLAGS" \
+    --setenv=HOMEOS_OWNER="$OWNER" --setenv=HOMEOS_REMOTE="$REMOTE" --setenv=HOMEOS_BRANCH="$BRANCH" \
+    --setenv=HOMEOS_FLAGS="$FLAGS" \
     -p StandardOutput=truncate:"$LOG" -p StandardError=inherit \
     /bin/bash -c "$JOB"

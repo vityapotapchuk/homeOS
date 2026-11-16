@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.18.2" src="https://img.shields.io/badge/version-0.18.2-4c8bf5">
+  <img alt="Version 0.19.0" src="https://img.shields.io/badge/version-0.19.0-4c8bf5">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-4c8bf5"></a>
   <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
   <img alt="Python 3, standard library only" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
@@ -82,8 +82,12 @@ or Zero 2 W (lite) · for remote access, a free [Tailscale](https://tailscale.co
 ### Updating
 
 Settings → Updates → *Check for updates*, then *Install*. The update widget on Home lights
-up when a new version is waiting. From the console:
-`cd ~/homeos-src && git pull && sudo ./install.sh --no-packages`.
+up when a new version is waiting. From the console: `sudo /opt/homeos/bin/homeos-update`.
+
+Updates are fetched and installed by root into `/var/lib/homeos/src`, a copy only root can
+change, from the repository and branch recorded when HomeOS was installed — the folder you
+cloned is never run as root by an update. For a private fork, sign in with `gh auth login`
+before running `install.sh`, so root can fetch it too.
 
 ## Features
 
@@ -131,7 +135,10 @@ up when a new version is waiting. From the console:
   `homeos-web --no-password`); anyone in your tailnet then gets in. Turn it back on with
   `homeos-web --ask-password`.
 - Only one root helper, `/opt/homeos/bin/homeos-update`, may run without a password
-  (for the update button), through a sudoers rule.
+  (for the update button), through a sudoers rule. It takes no arguments, reads only
+  root-owned settings and installs only from its own root-owned copy.
+- Changing the password (or asking for it again after it was switched off) ends every
+  session that was signed in before.
 
 | Command | What it does |
 |---|---|

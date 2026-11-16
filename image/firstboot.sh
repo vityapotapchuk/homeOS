@@ -63,14 +63,24 @@ HOME_DIR=$(getent passwd "$USER_NAME" | cut -d: -f6)
 as_user() { runuser -u "$USER_NAME" -- env HOME="$HOME_DIR" "$@"; }
 log "setting HomeOS up for $USER_NAME"
 
-# ---- HomeOS itself, from a copy in the user's home (so Settings > Updates can pull)
-if [ -d /opt/homeos-src ] && [ ! -e "$HOME_DIR/homeos-src" ]; then
-    mv /opt/homeos-src "$HOME_DIR/homeos-src"
+# ---- a failed step leaves the setup unfinished: it runs again at the next start,
+# up to three times; after that it gives up and says so (and the secrets go).
+STATE=/var/lib/homeos
+mkdir -p "$STATE"
+ATTEMPT=$(( $(cat "$STATE/firstboot.attempts" 2>/dev/null || echo 0) + 1 ))
+echo "$ATTEMPT" > "$STATE/firstboot.attempts"
+FAILED=""
+fail() { log "FAILED: $*"; FAILED="${FAILED:+$FAILED; }$*"; }
+
+# ---- HomeOS itself, from the root-owned copy that Settings > Updates also uses
+SRC_DIR=$STATE/src
+if [ -d /opt/homeos-src ] && [ ! -e "$SRC_DIR" ]; then
+    mv /opt/homeos-src "$SRC_DIR"
 fi
-chown -R "$USER_NAME": "$HOME_DIR/homeos-src"
+chown -R root:root "$SRC_DIR" && chmod -R go-w "$SRC_DIR"
 # shellcheck disable=SC2086
-HOMEOS_USER="$USER_NAME" "$HOME_DIR/homeos-src/install.sh" --no-packages $FLAGS </dev/null \
-    || log "install.sh reported a problem; see the lines above"
+HOMEOS_USER="$USER_NAME" "$SRC_DIR/install.sh" --no-packages $FLAGS </dev/null \
+    || fail "install.sh did not finish (see the lines above)"
 
 # ---- web password
 PW=$(getv HOMEOS_PASSWORD)
@@ -78,7 +88,7 @@ if [ -n "$PW" ]; then
     TMP=$(mktemp)
     printf '%s\n' "$PW" > "$TMP"
     chown "$USER_NAME" "$TMP"
-    as_user python3 /opt/homeos/shell/webshell.py --password-file "$TMP" || log "the web password was not saved"
+    as_user python3 /opt/homeos/shell/webshell.py --password-file "$TMP" || fail "the web password was not saved"
     rm -f "$TMP"
 fi
 
@@ -86,11 +96,16 @@ fi
 KEY=$(getv TAILSCALE_AUTHKEY)
 if [ -n "$KEY" ]; then
     systemctl start tailscaled.service || true
-    tailscale up --authkey="$KEY" --hostname="$(hostname)" || log "Tailscale did not accept the key"
+    tailscale up --authkey="$KEY" --hostname="$(hostname)" || fail "Tailscale did not accept the key"
     as_user python3 /opt/homeos/shell/webshell.py --set-bind tailscale >/dev/null || true
 else
     as_user python3 /opt/homeos/shell/webshell.py --set-bind all >/dev/null || true
     as_user python3 /opt/homeos/shell/webshell.py --allow-host "$(hostname).local" >/dev/null || true
+fi
+
+if [ -n "$FAILED" ] && [ "$ATTEMPT" -lt 3 ]; then
+    log "setup is not finished ($FAILED); it will be tried again at the next start (attempt $ATTEMPT of 3)"
+    exit 1
 fi
 
 # ---- the secrets leave the card
@@ -99,16 +114,26 @@ if [ -f "$CONF" ]; then
 fi
 
 # ---- motion detection, prepared in the full image
-if [ "${DETECT:-0}" -eq 1 ] && [ -d /opt/esp32cam ] && [ ! -e "$HOME_DIR/esp32cam" ] && [ -x "$HOME_DIR/homeos-src/setup-detect.sh" ]; then
+if [ "${DETECT:-0}" -eq 1 ] && [ -d /opt/esp32cam ] && [ ! -e "$HOME_DIR/esp32cam" ] && [ -x "$SRC_DIR/setup-detect.sh" ]; then
     mv /opt/esp32cam "$HOME_DIR/esp32cam"
     chown -R "$USER_NAME": "$HOME_DIR/esp32cam"
-    HOMEOS_USER="$USER_NAME" "$HOME_DIR/homeos-src/setup-detect.sh" --no-packages </dev/null \
+    HOMEOS_USER="$USER_NAME" "$SRC_DIR/setup-detect.sh" --no-packages </dev/null \
         || log "motion detection was not started"
 fi
 
 systemctl restart homeos-web.service 2>/dev/null || true
-mkdir -p /var/lib/homeos
-touch /var/lib/homeos/firstboot.done
+if [ -n "$FAILED" ]; then
+    # three tries are over: stop trying, and leave a note where it is easy to find
+    mkdir -p /etc/motd.d
+    printf 'HomeOS setup gave up after %s attempts: %s\nSee: journalctl -u homeos-firstboot\n' "$ATTEMPT" "$FAILED" \
+        | tee "$STATE/firstboot.failed" > /etc/motd.d/homeos-setup 2>/dev/null || true
+    touch "$STATE/firstboot.done"
+    systemctl disable homeos-firstboot.service >/dev/null 2>&1 || true
+    log "gave up: $FAILED"
+    exit 1
+fi
+touch "$STATE/firstboot.done"
+rm -f "$STATE/firstboot.attempts"
 systemctl disable homeos-firstboot.service >/dev/null 2>&1 || true
 log "done"
 

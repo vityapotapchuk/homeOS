@@ -27,6 +27,8 @@ jobs:
         run: |
           bash -n install.sh uninstall.sh image/*.sh
           for f in bin/*; do sh -n "$f"; done
+      - name: Tests
+        run: python -m unittest discover -s tests -t . -v
       - name: No secrets committed
         run: |
           ! grep -rInE '(tskey[-][a-z]+-[A-Za-z0-9]+|BEGIN (RSA|OPENSSH) PRIVATE KEY)' --exclude-dir=.git .

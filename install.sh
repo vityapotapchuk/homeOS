@@ -259,13 +259,53 @@ if [ "$LITE" -eq 1 ]; then echo lite > "$PREFIX/edition"; else echo full > "$PRE
 chmod 644 "$PREFIX/edition"
 
 # Where this copy came from, so Settings > Updates can fetch a newer one.
+# Updates are not taken from this folder later: bin/homeos-update fetches the
+# recorded remote and branch, as root, into /var/lib/homeos/src (a copy only
+# root can change) and runs install.sh from there. A folder the user can write
+# to is never run as root by an update.
+src_git() {     # git in the folder install.sh runs from, as the user who owns it
+    if [ "$(stat -c %u "$SRC")" -eq 0 ]; then git -C "$SRC" "$@"; else as_user git -C "$SRC" "$@"; fi
+}
+REMOTE="" BRANCH="" COMMIT=""
+if src_git rev-parse --git-dir >/dev/null 2>&1; then
+    REMOTE=$(src_git remote get-url origin 2>/dev/null || true)
+    BRANCH=$(src_git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+    COMMIT=$(src_git rev-parse HEAD 2>/dev/null || true)
+    case "$REMOTE" in https://*|ssh://*|git@*) ;; *) REMOTE="" ;; esac
+    printf '%s' "$BRANCH" | grep -Eq '^[A-Za-z0-9._/-]+$' || BRANCH=""
+fi
 {
     echo "SRC=$SRC"
+    echo "REMOTE=$REMOTE"
+    echo "BRANCH=$BRANCH"
     echo "FLAGS=${FLAGS# }"
     echo "OWNER=$TARGET_USER"
-    echo "COMMIT=$(as_user git -C "$SRC" rev-parse HEAD 2>/dev/null || true)"
+    echo "COMMIT=$COMMIT"
 } > "$PREFIX/source"
 chmod 644 "$PREFIX/source"
+
+# Root has to be able to fetch updates on its own. A private GitHub repository
+# needs a token: the one the user signed in with (gh auth login) is copied to a
+# file only root can read.
+CRED=/etc/homeos/git-credentials
+root_git() {
+    local c=(-c credential.helper=)
+    [ -f "$CRED" ] && c+=(-c "credential.helper=store --file=$CRED")
+    HOME=/root GIT_TERMINAL_PROMPT=0 git "${c[@]}" "$@"
+}
+if [ -n "$REMOTE" ] && [ -n "$BRANCH" ] && ! root_git ls-remote --exit-code "$REMOTE" "refs/heads/$BRANCH" >/dev/null 2>&1; then
+    case "$REMOTE" in
+        https://github.com/*)
+            TOKEN=$(as_user gh auth token 2>/dev/null || true)
+            if [ -n "$TOKEN" ]; then
+                install -d -m 0700 -o root -g root /etc/homeos
+                ( umask 077; printf 'https://x-access-token:%s@github.com\n' "$TOKEN" > "$CRED" )
+            fi
+            ;;
+    esac
+    root_git ls-remote --exit-code "$REMOTE" "refs/heads/$BRANCH" >/dev/null 2>&1 \
+        || warn "Updates from Settings cannot reach $REMOTE yet (for a private repository: gh auth login, then run install.sh again)."
+fi
 
 # Lets "Install update" in Settings and the Motion button in the Camera app work:
 # this user may run the update helper and switch the detection service on or
