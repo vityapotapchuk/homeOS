@@ -10,12 +10,15 @@ Used by both the desktop shell (sysapi.py) and web access (webshell.py).
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, quote, urlparse
 
 import devices
@@ -476,7 +479,7 @@ def weather(place):
         if _weather["key"] == key and time.time() - _weather["at"] < 900:
             return _weather["data"]
     url = ("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s"
-           "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m"
+           "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min"
            "&timezone=auto&forecast_days=4" % key)
     try:
@@ -490,7 +493,8 @@ def weather(place):
                          "max": round(daily["temperature_2m_max"][i]), "min": round(daily["temperature_2m_min"][i])})
         data = {"ok": True, "place": place["name"], "temp": round(cur["temperature_2m"]),
                 "feels": round(cur["apparent_temperature"]), "wind": round(cur["wind_speed_10m"]),
-                "kind": _weather_kind(code), "text": WEATHER_TEXT.get(code, ""), "days": days}
+                "kind": _weather_kind(code), "text": WEATHER_TEXT.get(code, ""), "days": days,
+                "fog": code in (45, 48), "night": cur.get("is_day", 1) == 0}
     except (OSError, ValueError, KeyError, TypeError, IndexError):
         with _weather_lock:
             if _weather["key"] == key and _weather["data"]:
@@ -585,6 +589,104 @@ def serve_tile(handler, query):
 # One table for the desktop shell and for web access.
 
 _history = None
+# --------------------------------------------------------------- a site's hero section
+# For the featured-site widget: the headline, the line under it and the main picture
+# of a site, read from its page (Open Graph tags, <h1>, <title>). Only for the user's
+# own site tiles, kept for six hours.
+
+_hero = {}
+_hero_lock = threading.Lock()
+HERO_TTL = 6 * 3600
+BROWSER_UA = {"User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36 HomeOS",
+              "Accept": "text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.5"}
+
+
+class _HeroParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.meta, self.title, self.h1, self._in = {}, "", "", None
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "meta":
+            k = (a.get("property") or a.get("name") or "").lower()
+            if k and a.get("content") and k not in self.meta:
+                self.meta[k] = a["content"].strip()
+        elif tag in ("title", "h1") and not getattr(self, tag):
+            self._in = tag
+
+    def handle_endtag(self, tag):
+        if tag == self._in:
+            self._in = None
+
+    def handle_data(self, data):
+        if self._in == "title":
+            self.title += data
+        elif self._in == "h1":
+            self.h1 += data
+
+
+def _tile_url(settings, url):
+    return any(t.get("url") == url for t in settings.get().get("tiles", []))
+
+
+def site_hero(url):
+    with _hero_lock:
+        c = _hero.get(url)
+        if c and time.time() - c["at"] < HERO_TTL:
+            return c
+    data = {"at": time.time(), "ok": False, "title": "", "text": "", "img": None, "ctype": ""}
+    try:
+        req = urllib.request.Request(url, headers=BROWSER_UA)
+        with urllib.request.urlopen(req, timeout=8) as r:
+            raw = r.read(2 * 1024 * 1024)
+            charset = r.headers.get_content_charset() or "utf-8"
+            base = r.geturl()
+        p = _HeroParser()
+        p.feed(raw.decode(charset, "replace"))
+        m = p.meta
+        squash = lambda t: re.sub(r"\s+", " ", t or "").strip()
+        h1 = squash(p.h1)
+        data["title"] = (h1 if 3 <= len(h1) <= 70 else "") or squash(m.get("og:title") or m.get("twitter:title") or p.title)[:90]
+        data["text"] = squash(m.get("og:description") or m.get("twitter:description") or m.get("description"))[:180]
+        img = m.get("og:image") or m.get("og:image:url") or m.get("twitter:image") or m.get("twitter:image:src")
+        if img:
+            img = urllib.parse.urljoin(base, img)
+            if img.startswith(("http://", "https://")):
+                with urllib.request.urlopen(urllib.request.Request(img, headers=BROWSER_UA), timeout=8) as r:
+                    ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
+                    body = r.read(6 * 1024 * 1024 + 1)
+                if ctype.startswith("image/") and ctype != "image/svg+xml" and len(body) <= 6 * 1024 * 1024:
+                    data["img"], data["ctype"] = body, ctype
+        data["ok"] = True
+    except (OSError, ValueError, UnicodeError) as e:
+        data["error"] = str(e)[:120]
+    with _hero_lock:
+        _hero[url] = data
+    return data
+
+
+def serve_site(handler, path, query, settings):
+    url = parse_qs(query).get("u", [""])[0]
+    if not _tile_url(settings, url):
+        return _fail(handler, 404, "Not one of your sites.")
+    h = site_hero(url)
+    if path == "/api/site/hero":
+        body = json.dumps({"ok": h["ok"], "title": h["title"], "text": h["text"], "image": bool(h["img"]),
+                           "v": int(h["at"])}).encode("utf-8")
+        ctype = "application/json; charset=utf-8"
+    else:
+        if not h["img"]:
+            return _fail(handler, 404, "This site has no main picture.")
+        body, ctype = h["img"], h["ctype"]
+    handler.send_response(200)
+    handler.send_header("Content-Type", ctype)
+    handler.send_header("Content-Length", str(len(body)))
+    handler.send_header("Cache-Control", "private, max-age=3600")
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 _config_dir = None
 
 
@@ -616,7 +718,7 @@ def _rb_call(fn):
 
 SERVE_PATHS = ("/api/camera/stream", "/api/camera/capture", "/api/radio/stream",
                "/api/detect/stream", "/api/detect/clip", "/api/files/get", "/api/rb/stream", "/api/map/tile",
-               "/api/printer/camera", "/api/printer/model")
+               "/api/printer/camera", "/api/printer/model", "/api/site/hero", "/api/site/hero-image")
 
 
 def serve(handler, path, query, settings):
@@ -637,6 +739,8 @@ def serve(handler, path, query, settings):
         _printer().model.serve(handler)
     elif path == "/api/map/tile":
         serve_tile(handler, query)
+    elif path in ("/api/site/hero", "/api/site/hero-image"):
+        serve_site(handler, path, query, settings)
     elif path == "/api/rb/stream":
         _rb().stream(handler)
     elif path == "/api/files/get":

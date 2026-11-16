@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: HomeOS version
+      description: Settings → About
+      placeholder: "0.17.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Raspberry Pi
+      options: [Raspberry Pi 5, Raspberry Pi Zero 2 W, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options: [Pi screen, Web access on a phone, Web access on a tablet, Web access on a computer]
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: "Output of `journalctl -u homeos-web -n 100` (remove anything private)"
+      render: text

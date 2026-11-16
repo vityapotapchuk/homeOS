@@ -1687,3 +1687,194 @@ body.spacey .signin { background: rgba(20, 24, 40, 0.55); backdrop-filter: blur(
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10); }
 body.spacey .signin input { color: #fff; }
 body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* =====================================================================
+   Big landscape screens (desktop, large tablet): a large clock on top,
+   the widgets below at about 70% of their size, centred.
+   ===================================================================== */
+@media (orientation: landscape) and (min-width: 1100px) and (min-height: 640px) {
+  .status { position: relative; min-height: 28vh; align-items: flex-start; justify-content: flex-end; padding-top: 18px; }
+  .status .when { position: absolute; left: 50%; top: 3.2vh; transform: translateX(-50%); align-items: center; text-align: center; gap: 0.6vh; }
+  .status .clock { font-size: clamp(72px, 17vh, 220px); line-height: 0.95; font-weight: 600; letter-spacing: -0.04em; }
+  .status .date { font-size: clamp(15px, 2.4vh, 28px); line-height: 1.3; color: var(--md-on-surface-variant); }
+  main.dash { padding-left: 15vw; padding-right: 15vw; }
+  .dash-grid { min-height: 0; }
+}
+
+/* =====================================================================
+   Widget backgrounds: a layer of quiet content behind each card's text.
+   ===================================================================== */
+.dcard { isolation: isolate; }
+.d-art { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; border-radius: inherit; }
+
+/* Radio: a spectrum along the bottom and a vinyl disc; they move while it plays */
+#w-radio .bars { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; display: flex; align-items: flex-end; gap: 3%; padding: 0 4%;
+  -webkit-mask: linear-gradient(to top, #000 10%, transparent); mask: linear-gradient(to top, #000 10%, transparent); opacity: 0.22; }
+#w-radio .bars i { flex: 1; height: var(--h); border-radius: 3px 3px 0 0; background: linear-gradient(to top, var(--md-primary), #b18cff);
+  transform-origin: bottom; transform: scaleY(0.35); transition: transform 0.6s var(--spring); }
+.radio-on #w-radio .bars i { animation: bar-dance 0.9s ease-in-out infinite alternate; }
+.radio-on #w-radio .bars { opacity: 0.38; }
+@keyframes bar-dance { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+#w-radio .disc { position: absolute; right: -22%; top: -30%; width: 70%; aspect-ratio: 1; border-radius: 50%; opacity: 0.18;
+  background: radial-gradient(circle, #e8e8f0 0 6%, #222 6.5% 16%, transparent 16.5%),
+              repeating-radial-gradient(circle, #2a2a30 0 2px, #35353c 2px 4px); box-shadow: 0 0 0 1px rgba(255,255,255,0.08); }
+.radio-on #w-radio .disc { animation: spin 6s linear infinite; opacity: 0.26; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Motion: radar rings; a sweep goes round while it is watching */
+#d-motion .rings { position: absolute; inset: -20%; opacity: 0.35;
+  background: repeating-radial-gradient(circle at 50% 42%, transparent 0 22px, color-mix(in srgb, #3ddc84 45%, transparent) 22px 23px); 
+  -webkit-mask: radial-gradient(circle at 50% 42%, #000 20%, transparent 70%); mask: radial-gradient(circle at 50% 42%, #000 20%, transparent 70%); }
+#d-motion .sweep { position: absolute; left: 50%; top: 42%; width: 160%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; opacity: 0;
+  background: conic-gradient(from 0deg, color-mix(in srgb, #3ddc84 55%, transparent), transparent 70deg); }
+#d-motion[aria-pressed="true"] .sweep { opacity: 0.35; animation: spin 3.2s linear infinite; }
+
+/* System: the temperature of the last minutes as a soft area chart */
+#d-system .d-art svg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 34%; opacity: 0.8; }
+#d-system .d-art .area { fill: color-mix(in srgb, var(--md-primary) 22%, transparent); }
+#d-system .d-art .line { fill: none; stroke: color-mix(in srgb, var(--md-primary) 70%, transparent); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+#d-system.hot .d-art .area { fill: rgba(255, 120, 80, 0.25); }
+#d-system.hot .d-art .line { stroke: rgba(255, 140, 90, 0.8); }
+
+/* Featured site: its letter, very large, and a field of dots */
+#w-site .letter { position: absolute; right: -6%; bottom: -18%; font-size: clamp(120px, 26vh, 320px); line-height: 1; font-weight: 800;
+  color: rgba(255, 255, 255, 0.07); letter-spacing: -0.05em; }
+#w-site .dots { position: absolute; inset: 0; opacity: 0.18;
+  background: radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1.5px) 0 0 / 14px 14px;
+  -webkit-mask: linear-gradient(200deg, #000, transparent 55%); mask: linear-gradient(200deg, #000, transparent 55%); }
+
+/* Printer: printed layers, and the model in the print fading in on the right */
+#w-printer .layers { position: absolute; inset: 0; opacity: 0.5;
+  background: repeating-linear-gradient(to top, rgba(255,255,255,0.045) 0 2px, transparent 2px 7px);
+  -webkit-mask: linear-gradient(to left, #000, transparent 75%); mask: linear-gradient(to left, #000, transparent 75%); }
+#w-printer .model { position: absolute; right: -6%; bottom: -8%; height: min(85%, 220px); aspect-ratio: 1; opacity: 0;
+  background: center / contain no-repeat; transition: opacity 0.6s; filter: saturate(1.1);
+  -webkit-mask: radial-gradient(closest-side, #000 55%, transparent); mask: radial-gradient(closest-side, #000 55%, transparent); }
+#w-printer.has-model .model { opacity: 0.22; }
+#w-printer.busy .layers { animation: rise-layers 4s linear infinite; }
+@keyframes rise-layers { to { background-position: 0 -7px; } }
+
+/* Update: quiet circles, like a refresh spreading out */
+#w-update .arcs { position: absolute; inset: 0; opacity: 0.25;
+  background: repeating-radial-gradient(circle at 50% 40%, transparent 0 14px, rgba(255,255,255,0.10) 14px 15px);
+  -webkit-mask: radial-gradient(circle at 50% 40%, #000 15%, transparent 75%); mask: radial-gradient(circle at 50% 40%, #000 15%, transparent 75%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .d-art *, .d-art { animation: none !important; }
+}
+
+.d-printer-temps { flex-wrap: wrap; }
+
+/* =====================================================================
+   Weather card: the sky of the current weather, moving.
+   ===================================================================== */
+.d-weather { isolation: isolate; transition: background 0.8s; }
+.d-weather .w-scene { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.d-weather .w-scene i { position: absolute; display: block; }
+.d-weather:has(.w-scene) .d-orb { display: none; }
+/* the colour of the sky */
+.d-weather[data-sky="sun"]    { background: linear-gradient(160deg, #1565c0 0%, #1e88e5 45%, #4fb3ff 100%); }
+.d-weather[data-sky="partly"] { background: linear-gradient(160deg, #1d5fa8 0%, #3f86cf 55%, #79b2e6 100%); }
+.d-weather[data-sky="cloud"]  { background: linear-gradient(160deg, #3d4d63 0%, #5b6d85 55%, #8193aa 100%); }
+.d-weather[data-sky="rain"]   { background: linear-gradient(160deg, #1f2d3d 0%, #2f4459 55%, #45607a 100%); }
+.d-weather[data-sky="storm"]  { background: linear-gradient(160deg, #15121f 0%, #2a2540 55%, #403a5c 100%); }
+.d-weather[data-sky="snow"]   { background: linear-gradient(160deg, #4f6f96 0%, #7d9cc1 55%, #b3c9e2 100%); }
+.d-weather[data-sky="fog"]    { background: linear-gradient(160deg, #56616e 0%, #7a8592 55%, #a2acb6 100%); }
+.d-weather.night[data-sky="sun"], .d-weather.night[data-sky="partly"] { background: linear-gradient(160deg, #060d24 0%, #10204a 55%, #1d3570 100%); }
+.d-weather.night[data-sky="cloud"], .d-weather.night[data-sky="rain"] { background: linear-gradient(160deg, #0d1420 0%, #1a2638 60%, #26364d 100%); }
+
+/* sun: a warm disc with slowly turning rays */
+.w-scene .sun { right: 6%; top: -14%; width: 46%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #fff6c8 0 18%, #ffd54f 24%, rgba(255, 193, 7, 0.35) 38%, transparent 66%); animation: sun-pulse 5s ease-in-out infinite; }
+.w-scene .sun b { position: absolute; inset: -30%; border-radius: 50%; opacity: 0.45;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 236, 160, 0.55) 0 6deg, transparent 6deg 20deg);
+  -webkit-mask: radial-gradient(circle, transparent 22%, #000 30%, transparent 70%); mask: radial-gradient(circle, transparent 22%, #000 30%, transparent 70%);
+  animation: spin 40s linear infinite; }
+@keyframes sun-pulse { 50% { transform: scale(1.06); } }
+/* moon and stars */
+.w-scene .moon { right: 12%; top: 10%; width: 18%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbe8, #e8e2c4 60%, #cfc8a8); box-shadow: 0 0 30px rgba(255, 248, 210, 0.45); }
+.w-scene .moon::after { content: ""; position: absolute; inset: 0 0 0 28%; border-radius: 50%; background: inherit; filter: brightness(0.15); opacity: 0; }
+.w-scene .star { width: 2px; height: 2px; border-radius: 50%; background: #fff; animation: twinkle 3.4s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: 0.2; } }
+/* clouds: soft blobs drifting across */
+.w-scene .cloud { left: -45%; width: 42%; height: 26%; transform: scale(var(--s)); animation: drift 50s linear infinite; opacity: 0.85;
+  background: radial-gradient(circle at 30% 65%, rgba(255,255,255,0.9) 0 28%, transparent 29%),
+              radial-gradient(circle at 55% 45%, rgba(255,255,255,0.9) 0 34%, transparent 35%),
+              radial-gradient(circle at 78% 66%, rgba(255,255,255,0.9) 0 24%, transparent 25%),
+              linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.9)) 22% 78% / 62% 26% no-repeat;
+  filter: blur(1px); }
+.d-weather[data-sky="rain"] .w-scene .cloud, .d-weather[data-sky="storm"] .w-scene .cloud, .night .w-scene .cloud { opacity: 0.32; }
+.d-weather[data-sky="cloud"] .w-scene .cloud { opacity: 0.55; }
+@keyframes drift { to { left: 110%; } }
+/* rain */
+.w-scene .drop { top: -12%; width: 1.5px; height: 14%; border-radius: 1px; transform: rotate(14deg);
+  background: linear-gradient(transparent, rgba(200, 225, 255, 0.95)); animation: fall 0.7s linear infinite; }
+@keyframes fall { to { top: 112%; translate: -40px 0; } }
+/* snow */
+.w-scene .flake { top: -6%; aspect-ratio: 1; border-radius: 50%; background: #fff; opacity: 0.9; animation: snow 6s linear infinite; }
+@keyframes snow { 50% { translate: var(--d) 0; } to { top: 108%; translate: 0 0; } }
+/* storm */
+.w-scene .flash { inset: 0; background: rgba(220, 225, 255, 0.0); animation: flash 7s infinite; }
+.w-scene .bolt { left: 58%; top: 8%; width: 8%; height: 46%; opacity: 0; animation: bolt 7s infinite;
+  background: linear-gradient(#fff, #fff) no-repeat; clip-path: polygon(40% 0, 70% 0, 52% 40%, 80% 40%, 30% 100%, 44% 52%, 18% 52%); filter: drop-shadow(0 0 6px #c9d4ff); }
+@keyframes flash { 0%, 90%, 94%, 100% { background: rgba(220,225,255,0); } 91%, 93% { background: rgba(220,225,255,0.35); } }
+@keyframes bolt { 0%, 90%, 95%, 100% { opacity: 0; } 91%, 93% { opacity: 1; } }
+/* fog */
+.w-scene .mist { left: -60%; width: 160%; height: 18%; border-radius: 50%; background: rgba(255, 255, 255, 0.22); filter: blur(10px); animation: mist 22s ease-in-out infinite alternate; }
+@keyframes mist { to { translate: 35% 0; } }
+/* wind */
+.w-scene .gust { left: -70%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent); animation: gust 2.2s ease-in infinite; }
+@keyframes gust { to { left: 120%; } }
+.windy .w-scene .cloud { animation-duration: 14s !important; }
+.windy .w-scene .drop { transform: rotate(32deg); }
+@media (prefers-reduced-motion: reduce) { .d-weather .w-scene i, .d-weather .w-scene i b { animation: none !important; } }
+
+/* Featured site: its hero section — the main picture full-bleed, the headline over it */
+.d-site-brand { display: none; }
+#w-site .d-art .hero { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 0.6s, transform 6s ease-out; }
+#w-site.has-pic .d-art .hero { opacity: 1; }
+#w-site.has-pic:hover .d-art .hero { transform: scale(1.05); }
+#w-site.has-pic .d-art::after { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.05) 75%); }
+#w-site.has-pic .d-art .letter, #w-site.has-pic .d-art .dots { display: none; }
+#w-site.has-hero .d-site-mark { display: none; }
+#w-site.has-hero .d-site-brand { display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; }
+#w-site.has-hero .d-site-text b { font-size: clamp(16px, 2.4vh, 24px); line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+#w-site.has-hero .w-sub { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 17px; }
+@media (max-width: 760px) {
+  .dash-grid.fit #w-site.has-hero .d-site-brand { font-size: 10px; padding: 3px 8px; }
+  .dash-grid.fit #w-site.has-hero .d-site-text b { font-size: 13px; line-height: 16px; -webkit-line-clamp: 2; }
+}
+
+/* Printer card while nothing prints: a pixel printer instead of the ring, big temperatures */
+.d-pixel { display: none; flex: none; width: 92px; aspect-ratio: 22 / 18; image-rendering: pixelated; }
+.d-pixel svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); }
+#w-printer.idle .d-ring { display: none; }
+#w-printer.idle .d-pixel { display: block; animation: px-bob 3.6s ease-in-out infinite; }
+#w-printer.idle .px-N { fill: #18202c; }
+#w-printer .px-L { animation: px-led 2.4s steps(1) infinite; }
+#w-printer.hot .px-O { fill: #ffb05c; filter: drop-shadow(0 0 1px #ff8a3d); }
+@keyframes px-bob { 50% { transform: translateY(-3px); } }
+@keyframes px-led { 50% { fill: #2a6b3d; } }
+#w-printer.idle .d-printer-temps { margin-top: 10px; }
+#w-printer.idle .d-printer-temps > span { padding: 8px 14px; border-radius: 14px; flex-direction: column; align-items: flex-start; gap: 0; }
+#w-printer.idle .d-printer-temps b { font-size: 22px; line-height: 26px; }
+@media (max-width: 760px) {
+  .dash-grid.fit .d-pixel { width: 60px; }
+  .dash-grid.fit #w-printer.idle .d-printer-temps > span { padding: 3px 9px; flex-direction: row; align-items: baseline; gap: 6px; }
+  .dash-grid.fit #w-printer.idle .d-printer-temps b { font-size: 15px; line-height: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { #w-printer .d-pixel, #w-printer .px-L { animation: none; } }
+/* weather text stays readable over the moving sky */
+.d-weather .w-head, .d-weather-foot { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35); }
+.d-weather-foot > div:first-child { flex: 1 1 auto; min-width: 0; }
+.d-weather-foot .w-line, .d-weather-foot .w-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-weather .w-days { flex: none; }
+.d-weather[data-sky="sun"] .w-scene .cloud, .d-weather[data-sky="partly"] .w-scene .cloud { opacity: 0.6; }
+/* a narrow weather card drops the three-day row so the weather itself fits */
+.d-weather { container-type: inline-size; }
+@container (max-width: 430px) { .d-weather .w-days { display: none; } }
+#w-site.has-hero .d-site-brand { max-width: calc(100% - 40px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }

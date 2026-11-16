@@ -1,19 +1,105 @@
-# HomeOS
-
-A touch-friendly home dashboard and shell for the Raspberry Pi, built on top of
-Raspberry Pi OS Lite (64-bit). It runs on the Pi's own screen as a desktop, and in
-any browser on your phone, tablet or computer through [Tailscale](https://tailscale.com).
-
-The design follows Google Material Design 3 Expressive, with light and dark themes,
-Roboto and Material Symbols bundled, so it looks the same on the Pi and on the web.
-Everything server-side is plain Python 3 (standard library only); the interface is
-plain HTML, CSS and JavaScript with no build step.
-
-## Screenshots
+<h1 align="center">HomeOS</h1>
 
 <p align="center">
-  <img src="docs/screenshots/home.webp" alt="Home: camera, printer, weather, radio and more widgets" width="100%">
+  <b>A touch-first home dashboard and shell for the Raspberry Pi</b><br>
+  On the Pi's own screen, and in any browser on your phone, tablet or computer.
 </p>
+
+<p align="center">
+  <a href="https://github.com/vityapotapchuk/homeos/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/vityapotapchuk/homeos?label=release&color=4c8bf5"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/vityapotapchuk/homeos?color=4c8bf5"></a>
+  <a href="https://github.com/vityapotapchuk/homeos/actions/workflows/check.yml"><img alt="Checks" src="https://github.com/vityapotapchuk/homeos/actions/workflows/check.yml/badge.svg"></a>
+  <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
+  <img alt="Python 3, no dependencies" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/home.webp" alt="HomeOS Home screen: a large clock over camera, printer, weather, radio and other widgets" width="100%">
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#web-access-and-security">Security</a> ·
+  <a href="#bambu-lab-printer">Printer</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+---
+
+HomeOS turns a Raspberry Pi running **Raspberry Pi OS Lite (64-bit)** into a small home
+hub: a widget dashboard, a camera viewer with motion events, a Bambu Lab printer
+monitor, radio, files, a system monitor, a terminal and a browser — with Material Design 3
+Expressive styling, light and dark themes and smooth animations.
+
+- **No build step, no dependencies.** The services are plain Python 3 (standard library
+  only); the interface is plain HTML, CSS and JavaScript.
+- **Private by default.** Web access listens only on the Pi and on its
+  [Tailscale](https://tailscale.com) address, behind a password.
+- **One-tap updates** from Settings: `git pull` and reinstall.
+
+## Install
+
+### Option 1 — a ready SD card image
+
+1. Download the image for your Pi from the
+   [latest release](https://github.com/vityapotapchuk/homeos/releases/latest):
+   - `homeos-pi5-*.img.xz` — Raspberry Pi 5, full edition (desktop on the screen, web access, browser, camera)
+   - `homeos-zero2w-*.img.xz` — Raspberry Pi Zero 2 W, lite edition (web access only)
+2. Write it with [Raspberry Pi Imager](https://www.raspberrypi.com/software/) → *Choose OS* →
+   *Use custom*. In Imager's OS customisation set a user, password, Wi-Fi and SSH.
+3. Open the card's `bootfs` drive and fill in `homeos.txt`: the web password and,
+   optionally, a [Tailscale auth key](https://login.tailscale.com/admin/settings/keys).
+   The secrets are wiped from the card after the first boot.
+4. Boot the Pi. The first start takes a few minutes longer. Then open
+   `http://homeos.local:8790` on your home network, or the Pi's Tailscale address.
+
+### Option 2 — on an existing Raspberry Pi OS Lite
+
+```sh
+sudo apt install -y git
+git clone https://github.com/vityapotapchuk/homeos.git ~/homeos-src
+cd ~/homeos-src
+sudo ./install.sh --web
+sudo reboot
+```
+
+The installer asks for a web password (8+ characters) and prints the address to open.
+
+| Command | What it does |
+|---|---|
+| `sudo ./install.sh` | desktop on the Pi's screen only, starts on boot |
+| `sudo ./install.sh --web` | desktop **and** web access |
+| `sudo ./install.sh --web-only` | web access only; the Pi keeps booting to the console |
+| `sudo ./install.sh --web-only --lite` | small edition for a Pi Zero 2 W: no browser, no camera |
+| `sudo ./install.sh --no-packages` | update HomeOS files only |
+| `sudo ./uninstall.sh` | remove HomeOS (system packages stay) |
+
+**Requirements:** Raspberry Pi OS Lite (64-bit) · Raspberry Pi 5 (full)
+or Zero 2 W (lite) · for remote access, a free [Tailscale](https://tailscale.com) account.
+
+### Updating
+
+Settings → Updates → *Check for updates*, then *Install*. The update widget on Home lights
+up when a new version is waiting. From the console:
+`cd ~/homeos-src && git pull && sudo ./install.sh --no-packages`.
+
+## Features
+
+| | |
+|---|---|
+| **Start page** | Large clock, weather and an animated night sky — 3D star field, nebula light, falling comets. It is also the sign-in page. |
+| **Home** | Widgets that always fill the screen: camera, 3D printer, weather, radio, a featured site, motion detection, Pi temperature, an OpenStreetMap map, updates. Layouts for big landscape screens (large clock on top), upright tablets, phones (everything on one screen) and 800×480 Pi displays. |
+| **Camera** | Live MJPEG camera (for example an ESP32-CAM) relayed by the Pi, with light, flip, resolution, brightness, contrast and frame-rate controls, photos and motion events. |
+| **Printer** | Bambu Lab printers on your LAN: job, progress, layer, time left, temperatures, fan, the printer's camera, a picture of the model being printed, pause / resume / stop, light, speed. |
+| **Files** | The user's home folder: browse, view, upload, download, rename, delete. |
+| **Monitor** | Temperature, CPU and memory history (1 h / 6 h / 24 h), disk and services. |
+| **Settings** | Wi-Fi and Bluetooth, display and theme, widgets, apps, printer, sign-in, sound, updates, about. |
+| **Terminal** | A real shell of the Pi user in the browser (can be switched off). |
+| **Browser** | On the Pi's screen a WebKit browser with tabs. On the web, sites open inside HomeOS; sites that refuse to be framed open in a headless Chromium on the Pi, streamed to you. |
+
+## Screenshots
 
 | Start page and sign-in | Camera with motion events |
 |---|---|
@@ -29,79 +115,23 @@ plain HTML, CSS and JavaScript with no build step.
   <img src="docs/screenshots/phone-settings.webp" alt="Phone: Settings as a list" width="30%">
 </p>
 
-<sub>Screenshots use demo data.</sub>
-
-## What is inside
-
-- **Start page** with a large clock, the weather and an animated night sky
-  (3D star field, nebula light, falling comets). It is also the sign-in page.
-- **Home** — a dashboard of widgets that always fill the screen, like a car's
-  display: camera, 3D printer, weather, radio, a featured site, motion detection,
-  system temperature, an OpenStreetMap map and an update button that lights up when
-  an update is ready. A dock at the bottom: Home, Camera, Apps, Settings.
-  Layouts for landscape and upright tablets, phones (everything on one screen) and
-  800×480 Pi displays.
-- **Apps** — Camera, Printer, Radio, Files, Monitor, Terminal, Browser and your own
-  site tiles.
-- **Camera** — live MJPEG camera (for example an ESP32-CAM), with its controls
-  (light, flip, resolution, brightness, contrast, frame rate), photos, and an optional
-  motion-detection service (events, clips, recording).
-- **Printer** — Bambu Lab printers on your home network: job, progress, layers, time
-  left, temperatures, fan, the printer's camera, a picture of the model being printed,
-  pause / resume / stop, light and speed.
-- **Files** — the user's home folder: browse, view, upload, download, rename, delete.
-- **Monitor** — temperature, CPU and memory history (1 h / 6 h / 24 h), disk and services.
-- **Settings** — Wi-Fi and Bluetooth, display, widgets, apps, printer, sign-in, sound,
-  updates (one tap: `git pull` and reinstall), about.
-- **Browser** — on the Pi screen a WebKit browser with tabs; on the web, sites open
-  inside HomeOS, and sites that refuse to be framed open in a headless Chromium on the Pi
-  whose screen is streamed to you.
-
-## Install
-
-1. Write **Raspberry Pi OS Lite (64-bit)** with Raspberry Pi Imager; set a user, Wi-Fi and SSH.
-2. On the Pi:
-
-   ```sh
-   git clone <this repository> ~/homeos-src
-   cd ~/homeos-src
-   sudo ./install.sh --web      # desktop on the screen + web access
-   sudo reboot
-   ```
-
-| Command | What it does |
-|---|---|
-| `sudo ./install.sh` | desktop only, starts on boot |
-| `sudo ./install.sh --web` | desktop and web access |
-| `sudo ./install.sh --web-only` | web access only (the Pi keeps booting to the console) |
-| `sudo ./install.sh --web-only --lite` | small edition for a Pi Zero 2 W: no browser, no camera |
-| `sudo ./install.sh --no-packages` | update HomeOS files only |
-| `sudo ./uninstall.sh` | remove HomeOS (packages stay) |
-
-### Ready-made SD card images
-
-`.github/workflows/images.yml` builds two images from the latest Raspberry Pi OS Lite and
-attaches them to a release (push a tag `images-…` or use *Run workflow*):
-`homeos-pi5-*.img.xz` (full) and `homeos-zero2w-*.img.xz` (lite). After writing a card,
-fill in `homeos.txt` on its `bootfs` drive (web password, optional Tailscale auth key);
-the secrets are wiped from the card after the first boot.
+<p align="center"><sub>Screenshots use demo data.</sub></p>
 
 ## Web access and security
 
-`install.sh --web` asks for a password (8+ characters) and prints the address,
-for example `http://100.x.y.z:8790/`.
-
-- The service listens only on `127.0.0.1` and on the Pi's Tailscale address — not on your
-  home network or the internet.
+- The web service listens only on `127.0.0.1` and on the Pi's Tailscale address — not on
+  your home network or the internet. (Images without a Tailscale key also answer at
+  `homeos.local` on the home network.)
 - Sign-in uses a scrypt-hashed password, an HttpOnly session cookie and a CSRF token;
-  after 8 failed attempts sign-in is locked for 5 minutes.
+  after 8 failed attempts sign-in is locked for 5 minutes. A strict Content-Security-Policy
+  is sent with every page.
 - The web terminal is a real shell of the HomeOS user. Turn it off with
   `homeos-web --terminal off`.
 - The password can be switched off for testing (Settings → Sign-in, or
-  `homeos-web --no-password`); anyone in your tailnet then gets in. Switch it back on with
+  `homeos-web --no-password`); anyone in your tailnet then gets in. Turn it back on with
   `homeos-web --ask-password`.
-- The update button may run exactly one root helper, `/opt/homeos/bin/homeos-update`,
-  through a sudoers rule; nothing else gets passwordless sudo.
+- Only one root helper, `/opt/homeos/bin/homeos-update`, may run without a password
+  (for the update button), through a sudoers rule.
 
 | Command | What it does |
 |---|---|
@@ -110,39 +140,53 @@ for example `http://100.x.y.z:8790/`.
 | `homeos-web --allow-host NAME` | allow opening by a host name, not only by IP |
 | `journalctl -u homeos-web` | the service log |
 
+Found a security problem? Please see [SECURITY.md](SECURITY.md).
+
 ## Bambu Lab printer
 
-Settings → Printer (or the Printer app): the printer's IP address and its LAN access code
-(on the printer: Settings → WLAN / LAN Only). The serial number is read from the printer's
-certificate. Connecting checks each step and says which one failed. The code is kept in
-`~/.config/homeos/printer.json` (readable by the owner only) and is never sent to the browser.
-From the console instead: `python3 /opt/homeos/shell/printer.py <ip> <access-code>`.
+Settings → Printer (or the Printer app): enter the printer's IP address and its LAN access
+code (on the printer: *Settings → WLAN / LAN Only*). HomeOS reads the serial number from
+the printer's certificate, checks each step of the connection and tells you which one
+failed. The code is stored in `~/.config/homeos/printer.json`, readable by the owner only,
+and is never sent to the browser.
 
-- Status: MQTT over TLS, port 8883. Recent firmware accepts commands (pause, stop, light,
-  speed) only in **LAN Only** mode with **Developer Mode** on; status works either way.
-- Camera: switch on **LAN Only Liveview**. A1 / P1 send JPEG pictures on port 6000;
-  X1, H2D and P2S stream RTSPS video on port 322, which needs `ffmpeg` on the Pi.
-- Model picture: read once per print from the `.3mf` on the printer over FTPS (port 990).
+| What | How | Needs |
+|---|---|---|
+| Status | MQTT over TLS, port 8883 | the access code |
+| Pause, stop, light, speed | the same connection | *LAN Only* + *Developer Mode* on recent firmware |
+| Camera, A1 / P1 | JPEG pictures over TLS, port 6000 | *LAN Only Liveview* |
+| Camera, X1 / H2D / P2S | RTSPS video, port 322 | *LAN Only Liveview* and `ffmpeg` |
+| Model picture | the `.3mf` on the printer, FTPS port 990 | — |
+
+From the console instead: `python3 /opt/homeos/shell/printer.py <printer-ip> <access-code>`.
 
 ## Camera, radio and motion detection
 
-- **Camera**: set the stream address in Settings → Apps (default `http://camera.local:81/stream`).
-  HomeOS fetches the stream itself and relays it, so it works over Tailscale too.
-- **Radio**: plays the stream of a self-hosted radio server on the Pi; set its address in
-  Settings → Apps.
-- **Motion detection**: HomeOS shows events and clips from a separate detection service on
-  port 8084 if one is running; it is not part of this repository.
+- **Camera** — set the stream address in Settings → Apps (default
+  `http://camera.local:81/stream`). The Pi fetches the stream and relays it, so it works
+  over Tailscale too. Controls follow the ESP32-CAM web server's `/control` API.
+- **Radio** — plays the stream of a radio server on the Pi; set its address in Settings → Apps.
+- **Motion detection** — HomeOS shows events and clips from a detection service on port
+  8084 if one is running. The service itself is not part of this repository.
 
-## Layout of the repository
+## Project layout
 
 | Path | What |
 |---|---|
-| `shell/` | the Python services (`sysapi.py` desktop API, `webshell.py` web access, `apps.py`, `printer.py`, …) |
-| `shell/ui/` | the interface (HTML, CSS, JS, bundled fonts and icons) |
-| `bin/` | the `homeos*` commands and the update helper |
-| `config/` | the labwc compositor setup for the desktop |
-| `image/` | building SD card images |
-| `install.sh`, `uninstall.sh` | installer |
+| [`shell/`](shell) | the Python services: `sysapi.py` (desktop API), `webshell.py` (web access), `apps.py`, `printer.py`, `metrics.py`, `updater.py`, … |
+| [`shell/ui/`](shell/ui) | the interface: HTML, CSS, JavaScript, bundled fonts and icons |
+| [`bin/`](bin) | the `homeos*` commands and the update helper |
+| [`config/`](config) | the labwc compositor setup for the desktop |
+| [`image/`](image) | building the SD card images |
+| [`.github/workflows/`](.github/workflows) | checks, and the image build that publishes releases |
 
-Third-party parts (Roboto, Material Symbols, xterm.js) and their licences are listed in
-`shell/THIRD-PARTY.md`.
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licence
+
+HomeOS is released under the [MIT licence](LICENSE). Bundled third-party parts (Roboto,
+Material Symbols, xterm.js) keep their own licences; see
+[`shell/THIRD-PARTY.md`](shell/THIRD-PARTY.md). HomeOS is an independent project, not
+affiliated with Raspberry Pi Ltd, Bambu Lab, Tailscale or Google.

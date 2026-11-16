@@ -1,0 +1,32 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Python compiles
+        run: python -m py_compile shell/*.py
+      - name: JavaScript parses
+        run: for f in shell/ui/*.js; do node --check "$f"; done
+      - name: Shell scripts parse
+        run: |
+          bash -n install.sh uninstall.sh image/*.sh
+          for f in bin/*; do sh -n "$f"; done
+      - name: No secrets committed
+        run: |
+          ! grep -rInE '(tskey[-][a-z]+-[A-Za-z0-9]+|BEGIN (RSA|OPENSSH) PRIVATE KEY)' --exclude-dir=.git .

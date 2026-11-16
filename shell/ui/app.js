@@ -646,6 +646,47 @@ function weatherIcon(kind) {
   if (kind === "storm") svg.appendChild(svgEl("path", { d: "M13 16l-3 4h2.5l-1 3 3.5-4.5h-2.5l1-2.5z" }));
   return svg;
 }
+/* The weather card shows the weather itself: its colour is the sky, and the sky moves —
+   sun with turning rays, drifting clouds, rain, snow, lightning, fog, wind streaks, stars at night. */
+function weatherScene(r) {
+  const box = $("w-weather");
+  let scene = box.querySelector(".w-scene");
+  if (!scene) {
+    scene = document.createElement("span");
+    scene.className = "w-scene";
+    scene.setAttribute("aria-hidden", "true");
+    box.prepend(scene);
+  }
+  const sky = !r.ok ? "partly" : r.fog ? "fog" : r.kind;
+  const windy = r.ok && r.wind >= 25;
+  const night = !!(r.ok && r.night);
+  const key = sky + "|" + windy + "|" + night;
+  box.dataset.sky = sky;
+  box.classList.toggle("night", night);
+  box.classList.toggle("windy", windy);
+  if (scene.dataset.key === key) return;
+  scene.dataset.key = key;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const parts = [];
+  if (sky === "sun" || sky === "partly") parts.push(night ? "<i class='moon'></i>" : "<i class='sun'><b></b></i>");
+  if (night) for (let i = 0; i < 26; i++)
+    parts.push(`<i class='star' style='left:${rnd(2, 98)}%;top:${rnd(2, 60)}%;animation-delay:${rnd(-4, 0)}s'></i>`);
+  const clouds = { sun: 0, partly: 2, cloud: 4, rain: 3, storm: 3, snow: 3, fog: 1 }[sky] || 0;
+  for (let i = 0; i < clouds; i++)
+    parts.push(`<i class='cloud' style='top:${rnd(-8, 34)}%;--s:${rnd(0.7, 1.35).toFixed(2)};animation-duration:${rnd(38, 70).toFixed(0)}s;animation-delay:${rnd(-70, 0).toFixed(0)}s'></i>`);
+  if (sky === "rain" || sky === "storm")
+    for (let i = 0; i < 46; i++)
+      parts.push(`<i class='drop' style='left:${rnd(-10, 105)}%;animation-duration:${rnd(0.55, 0.9).toFixed(2)}s;animation-delay:${rnd(-1, 0).toFixed(2)}s;opacity:${rnd(0.35, 0.8).toFixed(2)}'></i>`);
+  if (sky === "snow")
+    for (let i = 0; i < 40; i++)
+      parts.push(`<i class='flake' style='left:${rnd(-5, 100)}%;--d:${rnd(-30, 30).toFixed(0)}px;width:${rnd(3, 7).toFixed(1)}px;animation-duration:${rnd(4, 9).toFixed(1)}s;animation-delay:${rnd(-9, 0).toFixed(1)}s'></i>`);
+  if (sky === "storm") parts.push("<i class='flash'></i><i class='bolt'></i>");
+  if (sky === "fog") for (let i = 0; i < 4; i++)
+    parts.push(`<i class='mist' style='top:${18 + i * 20}%;animation-duration:${rnd(16, 28).toFixed(0)}s;animation-delay:${rnd(-28, 0).toFixed(0)}s'></i>`);
+  if (windy) for (let i = 0; i < 9; i++)
+    parts.push(`<i class='gust' style='top:${rnd(10, 85).toFixed(0)}%;width:${rnd(30, 70).toFixed(0)}%;animation-duration:${rnd(1.6, 3).toFixed(1)}s;animation-delay:${rnd(-3, 0).toFixed(1)}s'></i>`);
+  scene.innerHTML = parts.join("");
+}
 let weatherAt = 0;
 async function weatherRefresh(force) {
   const box = $("w-weather");
@@ -655,6 +696,7 @@ async function weatherRefresh(force) {
   try { r = await api("/api/weather"); } catch (e) { return; }
   weatherAt = Date.now();
   box.hidden = false;
+  weatherScene(r);
   $("w-weather-icon").replaceChildren(r.ok ? weatherIcon(r.kind) : weatherIcon("partly"));
   $("w-weather-icon").dataset.kind = r.ok ? r.kind : "partly";
   $("w-weather-temp").textContent = r.ok ? r.temp + "°" : "–";
@@ -709,9 +751,48 @@ $("d-motion").addEventListener("click", async () => {
     else { tile.setAttribute("aria-pressed", String(on)); $("d-motion-text").textContent = on ? "Starting…" : "Off"; }
   } catch (e) { toast(e.message); } finally { tile.disabled = false; }
 });
+/* ---------- what sits behind the widgets' content, so they are not plain coloured squares */
+function cardArt(id, html) {
+  const card = $(id);
+  if (!card || card.querySelector(".d-art")) return null;
+  const art = document.createElement("span");
+  art.className = "d-art";
+  art.setAttribute("aria-hidden", "true");
+  art.innerHTML = html;
+  card.prepend(art);
+  return art;
+}
+cardArt("w-radio", "<span class='bars'>" + "<i></i>".repeat(32) + "</span><span class='disc'></span>");
+cardArt("d-motion", "<span class='rings'></span><span class='sweep'></span>");
+cardArt("d-system", "<svg viewBox='0 0 100 40' preserveAspectRatio='none'><path class='area'/><path class='line'/></svg>");
+cardArt("w-site", "<span class='hero'></span><b class='letter'></b><span class='dots'></span>");
+cardArt("w-printer", "<span class='layers'></span><span class='model'></span>");
+cardArt("w-update", "<span class='arcs'></span>");
+cardArt("w-map", "");
+document.querySelectorAll("#w-radio .bars i").forEach((b, i) => {
+  b.style.setProperty("--h", (25 + Math.abs(Math.sin(i * 1.7)) * 75).toFixed(0) + "%");
+  b.style.animationDelay = (-(i * 137) % 1100) + "ms";
+  b.style.animationDuration = (700 + (i * 97) % 600) + "ms";
+});
+/* the system tile draws the Pi's temperature over the last minutes */
+const sysTemps = [];
+function sysSpark(t) {
+  if (typeof t !== "number") return;
+  sysTemps.push(t);
+  if (sysTemps.length > 48) sysTemps.shift();
+  if (sysTemps.length < 2) return;
+  const lo = Math.min(...sysTemps) - 2, hi = Math.max(...sysTemps) + 2;
+  const pts = sysTemps.map((v, i) => [(i / (sysTemps.length - 1)) * 100, 38 - ((v - lo) / (hi - lo)) * 30]);
+  const line = pts.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1)).join(" ");
+  const art = $("d-system").querySelector(".d-art svg");
+  art.querySelector(".line").setAttribute("d", line);
+  art.querySelector(".area").setAttribute("d", line + " L100 40 L0 40 Z");
+}
+
 $("d-system").addEventListener("click", openMonitor);
 function dashSystem() {
   const s = state.status || {};
+  sysSpark(s.temp);
   $("d-system-temp").textContent = typeof s.temp === "number" ? Math.round(s.temp) + "°C" : "–";
   $("d-system").classList.toggle("hot", typeof s.temp === "number" && s.temp >= 75);
   $("d-system-text").textContent = s.memory ? Math.round((s.memory.used / s.memory.total) * 100) + "% memory" : "System";
@@ -759,8 +840,30 @@ function siteWidget() {
   if (!tile) return;
   $("w-site-name").textContent = tile.name;
   document.querySelector("#w-site .d-site-mark").textContent = tile.name.charAt(0).toUpperCase();
-  try { $("w-site-host").textContent = new URL(tile.url).hostname.replace(/^www\./, ""); } catch (e) { $("w-site-host").textContent = ""; }
+  $("w-site").querySelector(".d-art .letter").textContent = tile.name.charAt(0).toUpperCase();
+  let host = "";
+  try { host = new URL(tile.url).hostname.replace(/^www\./, ""); } catch (e) { /* not a full address */ }
+  $("w-site-host").textContent = host;
   box.onclick = () => openBrowser(tile.url);
+  siteHero(box, tile, host);
+}
+/* the site's hero section: its main picture, headline and the line under it */
+async function siteHero(box, tile, host) {
+  const key = tile.url + "|" + tile.name;
+  if (box.dataset.hero === key) return;
+  box.dataset.hero = key;
+  box.classList.remove("has-hero");
+  const q = "?u=" + encodeURIComponent(tile.url) + (WEB ? "" : "&t=" + encodeURIComponent(TOKEN));
+  let h;
+  try { h = await (await fetch("/api/site/hero" + q, { credentials: "same-origin" })).json(); } catch (e) { return; }
+  if (box.dataset.hero !== key || !h.ok) return;
+  if (h.title) $("w-site-name").textContent = h.title;
+  $("w-site-host").textContent = h.text || host;
+  $("w-site-brand").textContent = tile.name;
+  const pic = box.querySelector(".d-art .hero");
+  pic.style.backgroundImage = h.image ? "url('/api/site/hero-image" + q + "&v=" + h.v + "')" : "";
+  box.classList.toggle("has-hero", true);
+  box.classList.toggle("has-pic", !!h.image);
 }
 
 /* the map: OpenStreetMap around the town chosen for the weather */
@@ -1071,14 +1174,56 @@ $("printer-back").addEventListener("click", () => {
 });
 
 /* the two Home widgets: the print job, and the temperatures */
+/* a pixel-art printer for the card while nothing is printing (an original drawing) */
+const PIXEL_PRINTER = [
+  "...KKKKKKKKKKKKKKK....",
+  "..KGGGGGGGGGGGGGGGK...",
+  "..KGDDDDDDDDDDDDDGK...",
+  "..KGDWWWWWWWWWWWDGK.ss",
+  "..KGDDDDDTTTDDDDDGKsSs",
+  "..KGDDDDDTTTDDDDDGKsSs",
+  "..KGDDDDDDODDDDDDGK.ss",
+  "..KGDbDDDDDDDDDDDGK...",
+  "..KGDDbDDDDDDDDDDGK...",
+  "..KGDDDDDDNDDDDDDGK...",
+  "..KGDDDDDNNNDDDDDGK...",
+  "..KGDDDDNNNNNDDDDGK...",
+  "..KGDPPPPPPPPPPPDGK...",
+  "..KGDDDDDDDDDDDDDGK...",
+  "..KGGGGGGGGGGGGGGGK...",
+  "..KGGLGGGGGGGGGGGGK...",
+  "..KKKKKKKKKKKKKKKKK...",
+  "...KK...........KK....",
+];
+const PIXEL_COLOURS = { K: "#23272e", G: "#454c57", W: "#a4adb8", D: "#18202c", T: "#dfe3e8", O: "#ff8a3d",
+  b: "#4f78a8", N: "#3ddc84", P: "#6e7681", s: "#1f9d57", S: "#3ddc84", L: "#7cff9b" };
+function pixelPrinter() {
+  const w = PIXEL_PRINTER[0].length, h = PIXEL_PRINTER.length;
+  let rects = "";
+  PIXEL_PRINTER.forEach((row, y) => [...row].forEach((c, x) => {
+    if (PIXEL_COLOURS[c]) rects += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${PIXEL_COLOURS[c]}" class="px-${c}"/>`;
+  }));
+  return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+}
+(() => {
+  const ring = $("w-printer-ring"), px = document.createElement("span");
+  px.className = "d-pixel";
+  px.innerHTML = pixelPrinter();
+  ring.after(px);
+})();
 function printerWidgetsShow(r) {
   const w = $("w-printer");
+  const pic = w.querySelector(".d-art .model"), m = r.model || {};
+  const src = m.status === "ok" && r.online ? "/api/printer/model?v=" + m.v + (WEB ? "" : "&t=" + encodeURIComponent(TOKEN)) : "";
+  if (pic.dataset.src !== src) { pic.dataset.src = src; pic.style.backgroundImage = src ? "url('" + src + "')" : ""; }
+  w.classList.toggle("has-model", !!src);
   w.hidden = !widgetOn("printer");
   $("w-printer-temps").hidden = !r.configured || !r.online;
   if (!r.configured) {
     $("w-printer-state").textContent = "Printer";
     $("w-printer-file").textContent = "Bambu Lab printer";
     $("w-printer-sub").textContent = "Tap to connect it";
+    w.classList.add("idle");
     $("w-printer-pct").textContent = "+";
     $("w-printer-ring").style.setProperty("--p", 0);
     return;
@@ -1086,7 +1231,9 @@ function printerWidgetsShow(r) {
   const busy = prBusy(r);
   $("w-printer-state").textContent = prState(r);
   w.classList.toggle("busy", busy);
-  $("w-printer-file").textContent = r.online ? (r.file || (busy ? "Printing" : "Nothing printing")) : "Not connected";
+  w.classList.toggle("idle", !busy && r.state !== "FINISH");
+  w.classList.toggle("hot", typeof r.nozzle === "number" && r.nozzle > 60);
+  $("w-printer-file").textContent = r.online ? (busy || r.state === "FINISH" ? (r.file || "Printing") : "Ready to print") : "Not connected";
   $("w-printer-sub").textContent = busy ? [prLeft(r.remaining), r.layers ? "layer " + r.layer + "/" + r.layers : ""].filter(Boolean).join(" · ")
     : r.online ? "" : (r.error || "Connecting…");
   const pct = busy || r.state === "FINISH" ? r.percent : 0;
