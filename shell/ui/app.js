@@ -614,7 +614,11 @@ async function radioRefresh() {
   const np = r.ok ? r.nowPlaying : null;
   $("radio-title").textContent = !r.ok ? "Radio is off" : np ? np.title : "The playlist is empty";
   $("radio-sub").textContent = !r.ok ? r.error
-    : np ? (np.listeners === 1 ? "1 listener" : (np.listeners || 0) + " listeners") : "Add tracks in the radio's admin page.";
+    : np ? (np.listeners === 1 ? "1 listener" : (np.listeners || 0) + " listeners") : "Add tracks below: upload a file or paste a link.";
+  radioClock = np && np.duration ? { pos: np.position || 0, dur: np.duration, at: Date.now() } : null;
+  $("radio-next").textContent = np && np.next && np.next !== np.title ? "Next: " + np.next : "";
+  radioTick();
+  if (!$("app-radio").hidden) stationRefresh(np);
   $("radio-play").disabled = !np && !radioOn();
   $("radio-skip").disabled = !np;
   $("w-radio").hidden = !widgetOn("radio");
@@ -623,6 +627,120 @@ async function radioRefresh() {
   $("w-radio-play").disabled = !np && !radioOn();
   $("w-radio-skip").disabled = !np;
 }
+/* the progress of the track on air, between the 5-second refreshes */
+let radioClock = null;
+const mmss = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+function radioTick() {
+  const c = radioClock;
+  const pos = c ? Math.min(c.dur, c.pos + (Date.now() - c.at) / 1000) : 0;
+  $("radio-pos").textContent = c ? mmss(pos) : "0:00";
+  $("radio-dur").textContent = c ? mmss(c.dur) : "0:00";
+  $("radio-bar").style.width = c ? (pos / c.dur) * 100 + "%" : "0";
+}
+setInterval(() => { if (!$("app-radio").hidden) radioTick(); }, 1000);
+
+/* ---------- the station: the playlist and its admin, inside HomeOS */
+let stationTracks = [];
+function trackRow(t, i, nowId) {
+  const li = el("li", "rs-item" + (t.id === nowId ? " on-air" : "") + (t.visible ? "" : " hidden-track") + (t.status !== "ready" ? " " + t.status : ""));
+  const num = el("span", "rs-num", t.id === nowId ? "" : String(i + 1));
+  if (t.id === nowId) num.append(el("span", "eq"), "");
+  if (t.id === nowId) num.querySelector(".eq").innerHTML = "<i></i><i></i><i></i><i></i>";
+  const text = el("span", "rs-text");
+  text.append(el("b", "", t.title));
+  const meta = t.status === "pending" ? "Fetching from the link…" : t.status === "failed" ? "Failed: " + (t.error || "unknown error")
+    : (t.duration ? mmss(t.duration) : "") + (t.visible ? "" : " · hidden") + (t.sourceUrl ? " · from a link" : "");
+  text.append(el("span", "sub", meta));
+  const btn = (ic, label, fn, dis) => {
+    const b = el("button", "round sm", "");
+    b.append(icon(ic));
+    b.setAttribute("aria-label", label);
+    b.title = label;
+    b.disabled = !!dis;
+    b.addEventListener("click", fn);
+    return b;
+  };
+  const tools = el("span", "rs-tools");
+  const up = btn("back", "Move up", () => stationMove(i, -1), i === 0);
+  up.classList.add("rs-up");
+  const down = btn("back", "Move down", () => stationMove(i, 1), i === stationTracks.length - 1);
+  down.classList.add("rs-down");
+  tools.append(up, down,
+    btn(t.visible ? "eye" : "eyeoff", t.visible ? "Hide from the stream" : "Put back in the stream",
+        () => stationCall("/api/radio/track", { id: t.id, visible: !t.visible }), t.status !== "ready"),
+    btn("text", "Rename", () => askName("Rename the track", t.title, "Rename",
+        (title) => api("/api/radio/track", { id: t.id, title }).then((r) => { stationRefresh(); return r; }))),
+    btn("close", "Delete", () => confirmSheet("Delete “" + t.title + "”?", "The file is removed from the Pi.", "Delete",
+        () => stationCall("/api/radio/delete", { id: t.id }))));
+  li.append(num, text, tools);
+  return li;
+}
+async function stationRefresh(np) {
+  let r;
+  try { r = await api("/api/radio/tracks"); } catch (e) { return; }
+  const card = $("rs-card");
+  card.classList.toggle("off", !r.ok);
+  if (!r.ok) { $("rs-sum").textContent = r.error; $("rs-list").textContent = ""; return; }
+  stationTracks = r.tracks;
+  const ready = r.tracks.filter((t) => t.status === "ready" && t.visible);
+  const total = ready.reduce((s, t) => s + (t.duration || 0), 0);
+  $("rs-sum").textContent = r.tracks.length ? ready.length + (ready.length === 1 ? " track" : " tracks") + " on air · " +
+    (total >= 3600 ? Math.floor(total / 3600) + " h " + Math.round((total % 3600) / 60) + " min" : mmss(total)) + " a round" : "No tracks yet";
+  $("rs-public").checked = !!r.public;
+  $("rs-url").placeholder = r.ytdlp ? "Add from a link (YouTube, SoundCloud, Bandcamp…)" : "Links need yt-dlp on the Pi (sudo apt install yt-dlp)";
+  const nowId = np && np.id;
+  const list = $("rs-list");
+  list.textContent = "";
+  r.tracks.forEach((t, i) => list.appendChild(trackRow(t, i, nowId)));
+  if (r.tracks.some((t) => t.status === "pending")) setTimeout(() => !$("app-radio").hidden && stationRefresh(np), 3000);
+}
+async function stationCall(path, body) {
+  try {
+    const r = await api(path, body);
+    if (!r.ok) toast(r.error);
+    radioRefresh();
+    return r;
+  } catch (e) { toast(e.message); }
+}
+function stationMove(i, dir) {
+  const ids = stationTracks.map((t) => t.id);
+  const j = i + dir;
+  if (j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  stationCall("/api/radio/reorder", { order: ids });
+}
+$("rs-upload").addEventListener("click", () => $("rs-file").click());
+$("rs-file").addEventListener("change", async () => {
+  const picked = Array.from($("rs-file").files);
+  $("rs-file").value = "";
+  const prog = $("rs-progress");
+  let done = 0;
+  for (const [n, f] of picked.entries()) {
+    prog.hidden = false;
+    prog.textContent = "Uploading " + (n + 1) + " of " + picked.length + ": " + f.name;
+    try {
+      const res = await fetch("/api/radio/upload?name=" + encodeURIComponent(f.name) + "&title=" + encodeURIComponent(f.name.replace(/\.[^.]+$/, "")), {
+        method: "POST", headers: { "X-HomeOS-Token": TOKEN, "Content-Type": "application/octet-stream" }, body: f,
+      });
+      const r = await res.json().catch(() => ({ ok: false, error: "Upload failed (" + res.status + ")." }));
+      if (r.ok) done++; else toast(f.name + ": " + r.error);
+    } catch (e) { toast(f.name + ": " + e.message); }
+  }
+  prog.hidden = true;
+  if (done) toast(done === 1 ? "Track added to the station." : done + " tracks added to the station.");
+  radioRefresh();
+});
+$("rs-url-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const url = $("rs-url").value.trim();
+  if (!url) return;
+  const r = await stationCall("/api/radio/from-url", { url });
+  if (r && r.ok) { $("rs-url").value = ""; toast("Fetching the audio. It joins the station when it is ready."); }
+});
+$("rs-public").addEventListener("change", () => stationCall("/api/radio/public", { on: $("rs-public").checked })
+  .then((r) => r && r.ok && toast(r.public ? "Anyone on the home network can listen at port 8081." : "The stream is only on this Pi now.")));
+$("rs-restart").addEventListener("click", () => stationCall("/api/radio/restart", {}).then((r) => r && r.ok && toast("The stream starts again.")));
+
 function openRadio() {
   $("app-radio").hidden = false;
   radioRefresh();

@@ -20,7 +20,7 @@ STEP = 60                   # seconds between history samples
 KEEP = 24 * 60              # history samples kept (one day)
 SERVICES = (
     ("homeos-detect", "Motion detection"),
-    ("home-radio", "Radio"),
+    ("homeos-radio", "Radio"),
     ("homeos-web", "Web access"),
 )
 

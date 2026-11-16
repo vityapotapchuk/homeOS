@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.19.3" src="https://img.shields.io/badge/version-0.19.3-4c8bf5">
+  <img alt="Version 0.20.0" src="https://img.shields.io/badge/version-0.20.0-4c8bf5">
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-4c8bf5"></a>
   <img alt="Raspberry Pi 5 and Zero 2 W" src="https://img.shields.io/badge/Raspberry%20Pi-5%20%C2%B7%20Zero%202%20W-c51a4a?logo=raspberrypi&logoColor=white">
   <img alt="Python 3, standard library only" src="https://img.shields.io/badge/Python-3%20%C2%B7%20standard%20library-3776ab?logo=python&logoColor=white">
@@ -98,6 +98,7 @@ before running `install.sh`, so root can fetch it too.
 | **Camera** | Live MJPEG camera (for example an ESP32-CAM) relayed by the Pi, with light, flip, resolution, brightness, contrast and frame-rate controls, photos and motion events. |
 | **Printer** | Bambu Lab printers on your LAN: job, progress, layer, time left, temperatures, fan, the printer's camera, a picture of the model being printed, pause / resume / stop, light, speed. |
 | **Files** | The user's home folder: browse, view, upload, download, rename, delete. |
+| **Radio** | A looping radio station on the Pi with its own admin: uploads, links via yt-dlp, order, hide, skip, sharing on the home network. |
 | **Monitor** | Temperature, CPU and memory history (1 h / 6 h / 24 h), disk and services. |
 | **Settings** | Wi-Fi and Bluetooth, display and theme, widgets, apps, printer, sign-in, sound, updates, about. |
 | **Terminal** | A real shell of the Pi user in the browser (can be switched off). |
@@ -172,7 +173,12 @@ From the console instead: `python3 /opt/homeos/shell/printer.py <printer-ip> <ac
 - **Camera** — set the stream address in Settings → Apps (default
   `http://camera.local:81/stream`). The Pi fetches the stream and relays it, so it works
   over Tailscale too. Controls follow the ESP32-CAM web server's `/control` API.
-- **Radio** — plays the stream of a radio server on the Pi; set its address in Settings → Apps.
+- **Radio** — a looping radio station built in (`shell/radio.py`, service `homeos-radio`,
+  port 8081): everyone hears the same moment of the same track. The Radio app shows the
+  track on air with its progress and the next one, and holds the whole station: upload
+  audio files, add tracks from a link (YouTube, SoundCloud… through `yt-dlp`), reorder,
+  rename, hide, delete, skip, restart, and share the stream on the home network. The
+  encoder (`ffmpeg`) runs only while someone listens.
 - **Motion detection** — HomeOS shows events and clips from a detection service on port
   8084 if one is running. The service itself is not part of this repository.
 

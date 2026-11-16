@@ -18,6 +18,10 @@ if [ -n "$TARGET_USER" ] && [ "$TARGET_USER" != root ] && id "$TARGET_USER" >/de
     done
 fi
 
+if [ -f /etc/systemd/system/homeos-radio.service ]; then
+    systemctl disable --now homeos-radio.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/homeos-radio.service
+fi
 if [ -f /etc/systemd/system/homeos-web.service ]; then
     systemctl disable --now homeos-web.service >/dev/null 2>&1 || true
     rm -f /etc/systemd/system/homeos-web.service

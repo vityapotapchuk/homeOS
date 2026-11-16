@@ -370,9 +370,28 @@
       <p class="label">Now playing <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span></p>
       <p class="radio-title" id="radio-title">–</p>
       <p class="sub" id="radio-sub">&nbsp;</p>
+      <div class="rs-time"><span id="radio-pos">0:00</span><div class="rs-bar"><b id="radio-bar"></b></div><span id="radio-dur">0:00</span></div>
+      <p class="sub" id="radio-next"></p>
       <div class="row">
         <button class="btn" id="radio-play">Play</button>
         <button class="btn ghost" id="radio-skip">Next track</button>
+      </div>
+    </article>
+    <article class="card rs-card" id="rs-card">
+      <div class="rs-head">
+        <div><p class="label">Station</p><p class="sub" id="rs-sum">–</p></div>
+        <button class="btn" id="rs-upload"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-upload"/></svg>Upload</button>
+        <input type="file" id="rs-file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac,.opus" multiple hidden>
+      </div>
+      <form class="rs-url" id="rs-url-form" autocomplete="off">
+        <input type="url" id="rs-url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="Add from a link (YouTube, SoundCloud, Bandcamp…)">
+        <button class="btn tonal" type="submit">Add</button>
+      </form>
+      <p class="sub rs-progress" id="rs-progress" hidden></p>
+      <ol class="rs-list" id="rs-list"></ol>
+      <div class="rs-foot">
+        <label class="check-row"><input type="checkbox" id="rs-public">Share the stream on the home network (port 8081)</label>
+        <button class="btn ghost" id="rs-restart">Restart stream</button>
       </div>
     </article>
     <audio id="radio-audio" preload="none"></audio>

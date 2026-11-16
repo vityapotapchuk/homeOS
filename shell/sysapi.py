@@ -31,7 +31,7 @@ from urllib.parse import parse_qs, quote, urlparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import apps  # noqa: E402
 
-VERSION = "0.19.3"
+VERSION = "0.20.0"
 BACKGROUNDS = ("plain", "aurora", "sunset", "ocean", "forest")
 
 SEARCH_ENGINES = {
@@ -46,7 +46,7 @@ DEFAULT_SETTINGS = {
     "search": "duckduckgo",
     "homepage": "",
     "camera": apps.DEFAULT_CAMERA,      # MJPEG stream shown by the Camera app
-    "radio": apps.DEFAULT_RADIO,        # home-radio on this Pi
+    "radio": apps.DEFAULT_RADIO,        # the HomeOS radio service on this Pi
     "detect": apps.DEFAULT_DETECT,      # motion detection service on this Pi
     "weather": None,                    # {"name", "lat", "lon"} of the town for the weather widget
     "widgets": list(apps.WIDGETS),      # widgets shown on the home screen
@@ -637,6 +637,8 @@ class Server:
                 url = urlparse(self.path)
                 if url.path == "/api/files/upload":          # the body is the file, not JSON
                     return apps.files.receive(self, url.query)
+                if url.path == "/api/radio/upload":
+                    return apps.radio_upload(self, url.query, srv.settings)
                 try:
                     n = int(self.headers.get("Content-Length", "0"))
                 except ValueError:

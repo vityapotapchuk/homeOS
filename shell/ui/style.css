@@ -1112,14 +1112,17 @@ button.dcard:active { transform: scale(0.98); border-radius: 20px; }
 .d-radio-bar b { display: block; height: 100%; width: 0; background: var(--play); border-radius: 2px; }
 .radio-on .d-radio-bar b { animation: bar 30s linear infinite; }
 @keyframes bar { from { width: 0; } to { width: 100%; } }
-.d-radio-ctl { display: flex; align-items: center; justify-content: center; gap: 28px; }
+/* the play button sits in the middle whether the side buttons show or not */
+.d-radio-ctl { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center; column-gap: 20px; }
+.d-radio-ctl #w-radio-open { justify-self: end; } .d-radio-ctl #w-radio-skip { justify-self: start; }
+.d-radio-ctl .d-play { grid-column: 2; }
 .d-ctl { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--md-on-surface); }
 .d-ctl svg { width: 26px; height: 26px; }
 .d-play { width: 68px; height: 68px; border-radius: 50%; background: var(--play); color: var(--play-on); font-size: 0; display: grid; place-items: center;
   transition: transform var(--t-fast) var(--spring-fast), border-radius var(--t-fast) var(--spring-fast); }
 .d-play::before { content: ""; width: 30px; height: 30px; background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E") center / contain no-repeat; }
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.6 5v14l11-7z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.6 5v14l11-7z'/%3E%3C/svg%3E") center / contain no-repeat; }
 .radio-on .d-play::before {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E"); }
@@ -1617,7 +1620,7 @@ body, .panel, #v-browser, #v-terminal { background: var(--page-bg); }
   .dash-grid.fit .d-weather .w-big { font-size: 34px; line-height: 38px; }
   .dash-grid.fit .d-weather .w-line, .dash-grid.fit .d-radio .w-line { font-size: 13px; line-height: 17px; }
   .dash-grid.fit .d-radio { justify-content: space-between; }
-  .dash-grid.fit .d-radio-ctl { justify-content: flex-start; margin: 0; }
+  .dash-grid.fit .d-radio-ctl { margin: 0; }
   .dash-grid.fit .d-radio .d-play { width: 48px; height: 48px; }
   /* small tiles: icon and value */
   .dash-grid.fit .d-tile { gap: 4px; padding: 8px; justify-content: center; }
@@ -1896,3 +1899,37 @@ body.spacey .signin.open { background: none; box-shadow: none; backdrop-filter: 
 /* motion detection that did not start */
 .d-motion.failed .d-glow { background: linear-gradient(#5a2a2a, #3a1d1d); box-shadow: none; }
 .d-motion.failed .w-sub { color: #ffb4ab; }
+
+/* ---------- Radio app: the track on air and the station's playlist */
+.rs-time { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); }
+.rs-bar { flex: 1; height: 4px; border-radius: 4px; background: var(--md-surface-container-highest); overflow: hidden; }
+.rs-bar b { display: block; height: 100%; width: 0; background: var(--play); border-radius: inherit; transition: width 1s linear; }
+.rs-card { margin-top: 16px; }
+.rs-card.off .rs-url, .rs-card.off .rs-foot, .rs-card.off #rs-upload { opacity: 0.4; pointer-events: none; }
+.rs-head { display: flex; align-items: center; gap: 12px; }
+.rs-head > div { flex: 1; min-width: 0; }
+.rs-head .btn svg { width: 18px; height: 18px; margin-right: 6px; vertical-align: -3px; }
+.rs-url { display: flex; gap: 8px; margin: 14px 0 6px; }
+.rs-url input { flex: 1; min-width: 0; height: 44px; padding: 0 16px; border-radius: 22px; border: 0; color: inherit; font: inherit;
+  background: var(--md-surface-container-highest); }
+.rs-progress { margin: 6px 0; }
+.rs-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rs-item { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; border-radius: 16px; }
+.rs-item:hover { background: var(--md-surface-container-high); }
+.rs-item.on-air { background: color-mix(in srgb, var(--play) 16%, transparent); }
+.rs-item.hidden-track .rs-text, .rs-item.failed .rs-text { opacity: 0.55; }
+.rs-item.failed .rs-text .sub { color: var(--md-error); opacity: 1; }
+.rs-item.pending .rs-text b::after { content: " …"; }
+.rs-num { width: 22px; flex: none; text-align: center; font-variant-numeric: tabular-nums; color: var(--md-on-surface-variant); font-size: 13px; }
+.rs-num .eq { display: inline-flex; margin: 0; }
+.rs-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rs-text b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-text .sub { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-tools { display: flex; gap: 2px; flex: none; }
+.rs-tools .round.sm { width: 36px; height: 36px; }
+.rs-tools .round.sm svg { width: 20px; height: 20px; }
+.rs-up svg { transform: rotate(90deg); } .rs-down svg { transform: rotate(-90deg); }
+.rs-tools .round.sm:disabled { opacity: 0.3; }
+.rs-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 560px) { .rs-tools .round.sm { width: 32px; height: 32px; } .rs-tools .round.sm svg { width: 18px; height: 18px; } .rs-item { gap: 8px; padding-left: 6px; } }
+.rs-card, #app-radio .radio-card { width: 100%; max-width: 720px; margin-left: auto; margin-right: auto; box-sizing: border-box; }

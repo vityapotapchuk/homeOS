@@ -116,9 +116,10 @@ if [ "$PACKAGES" -eq 1 ]; then
         apt-get install -y python3 util-linux git
         OPTIONAL=(network-manager bluez rfkill)
     fi
+    OPTIONAL+=(ffmpeg yt-dlp)          # the radio: ffmpeg plays it, yt-dlp adds tracks from a link
     # the Pi browser of the web version: a headless Chromium on the Pi
     if [ "$WEB" -eq 1 ] && [ "$CHROMIUM" -eq 1 ]; then
-        OPTIONAL+=(chromium ffmpeg)     # ffmpeg: the camera of X1, H2D and P2S printers
+        OPTIONAL+=(chromium)
     fi
 
     say "Installing extras"
@@ -132,13 +133,17 @@ if [ "$PACKAGES" -eq 1 ]; then
         warn "Could not install: ${MISSING[*]}. HomeOS works without them, with fewer features."
     fi
 fi
-# updates run without packages: still bring in ffmpeg, which the camera of X1, H2D and P2S printers needs
-if [ "$PACKAGES" -eq 0 ] && [ "$WEB" -eq 1 ] && [ "$CHROMIUM" -eq 1 ] && ! command -v ffmpeg >/dev/null 2>&1 \
-   && command -v apt-get >/dev/null 2>&1; then
-    say "Installing ffmpeg (for printer cameras)"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y ffmpeg >/dev/null 2>&1 \
-        || { apt-get update >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get install -y ffmpeg >/dev/null 2>&1; } \
-        || warn "Could not install ffmpeg. Printer cameras of X1, H2D and P2S need it: sudo apt install ffmpeg"
+# updates run without packages: still bring in what the radio (and printer cameras) need
+if [ "$PACKAGES" -eq 0 ] && command -v apt-get >/dev/null 2>&1; then
+    NEED=()
+    command -v ffmpeg >/dev/null 2>&1 || NEED+=(ffmpeg)
+    command -v yt-dlp >/dev/null 2>&1 || NEED+=(yt-dlp)
+    for pkg in "${NEED[@]}"; do
+        say "Installing $pkg (for the radio)"
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >/dev/null 2>&1 \
+            || { apt-get update >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >/dev/null 2>&1; } \
+            || warn "Could not install $pkg: sudo apt install $pkg"
+    done
 fi
 
 if [ "$PACKAGES_ONLY" -eq 1 ]; then
@@ -325,6 +330,40 @@ if [ -d /etc/sudoers.d ] && command -v visudo >/dev/null 2>&1; then
     fi
     rm -f "$RULE"
 fi
+
+# ---------------------------------------------------------------- radio
+# The radio station (shell/radio.py) runs as its own service for the user, on
+# port 8081 (only on this Pi unless sharing is switched on in the Radio app).
+# An earlier stand-alone radio server (radio-server.service) is switched off
+# here, and the radio takes over its playlist and files once.
+for old in radio-server.service; do
+    if [ -f "/etc/systemd/system/$old" ]; then
+        say "Switching off the old radio server ($old); HomeOS Radio takes over its playlist"
+        systemctl disable --now "$old" >/dev/null 2>&1 || true
+    fi
+done
+RADIO_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+cat > /etc/systemd/system/homeos-radio.service <<UNIT
+[Unit]
+Description=HomeOS Radio (a looping radio station, port 8081)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=$TARGET_USER
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=$RADIO_HOME
+ExecStart=/usr/bin/python3 $PREFIX/shell/radio.py --config $RADIO_HOME/.config/homeos
+Restart=always
+RestartSec=3
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload || true
+systemctl enable homeos-radio.service >/dev/null 2>&1 || true
+systemctl restart homeos-radio.service || warn "The radio did not start. See: journalctl -u homeos-radio"
 
 # ---------------------------------------------------------------- web access
 if [ "$WEB" -eq 1 ]; then

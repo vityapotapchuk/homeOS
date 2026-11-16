@@ -2,7 +2,7 @@
 
 Camera relays the MJPEG stream of a network camera (an ESP32-CAM by default),
 so the picture is reachable from the Pi's own address and the camera only ever
-sees one client. Radio talks to home-radio running on this Pi.
+sees one client. Radio talks to the HomeOS radio service (radio.py) on this Pi.
 
 Used by both the desktop shell (sysapi.py) and web access (webshell.py).
 """
@@ -248,21 +248,88 @@ def serve_capture(handler, url):
 
 # --------------------------------------------------------------- radio
 
+def _radio_dir():
+    return os.path.join(_config_dir or os.path.expanduser("~/.config/homeos"), "radio")
+
+
 def _radio_token():
-    """The admin secret of home-radio, needed for 'next track'."""
-    paths = [os.environ.get("HOMEOS_RADIO_ENV"), os.path.expanduser("~/home-radio/.env")]
-    for path in paths:
-        if not path:
-            continue
+    """The admin secret of the radio service (radio.py writes it, mode 600)."""
+    try:
+        with open(os.path.join(_radio_dir(), "token"), encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def radio_admin(base, method, path, body=None, timeout=10):
+    """Calls an admin route of the radio service with its token."""
+    token = _radio_token()
+    if not token:
+        return {"ok": False, "error": RADIO_OFF}
+    data = json.dumps(body or {}).encode("utf-8") if method != "GET" else None
+    req = urllib.request.Request(base.rstrip("/") + path, data=data, method=method,
+                                 headers={**UA, "Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            out = json.loads(r.read(4 * 1024 * 1024) or b"{}")
+        return {"ok": True, **out}
+    except urllib.error.HTTPError as e:
         try:
-            with open(path, encoding="utf-8") as f:
-                for line in f:
-                    key, _, value = line.strip().partition("=")
-                    if key == "ADMIN_TOKEN" and value:
-                        return value.strip().strip('"').strip("'")
+            msg = json.loads(e.read(65536) or b"{}").get("error")
+        except ValueError:
+            msg = None
+        return {"ok": False, "error": msg or "The radio refused (%d)." % e.code}
+    except (OSError, ValueError):
+        return {"ok": False, "error": RADIO_OFF}
+
+
+AUDIO_UPLOAD = (".mp3", ".wav", ".m4a", ".ogg", ".flac", ".aac", ".opus")
+
+
+def radio_upload(handler, query, settings):
+    """POST with the raw audio file as the body: ?name=<file name>&title=<title>.
+    The file goes to the radio's incoming folder; the radio checks and takes it."""
+    q = parse_qs(query)
+    name = os.path.basename(q.get("name", [""])[0])
+    ext = os.path.splitext(name)[1].lower()
+    try:
+        n = int(handler.headers.get("Content-Length", "-1"))
+    except ValueError:
+        n = -1
+    if ext not in AUDIO_UPLOAD:
+        handler.close_connection = True
+        return files._json(handler, 400, {"ok": False, "error": "Choose an audio file (MP3, WAV, M4A, OGG, FLAC)."})
+    if n <= 0 or n > 300 * 1024 * 1024:
+        handler.close_connection = True
+        return files._json(handler, 413, {"ok": False, "error": "The file is too large (300 MB at most)."})
+    folder = os.path.join(_radio_dir(), "incoming")
+    os.makedirs(folder, exist_ok=True)
+    tmp = os.path.join(folder, "up-%d-%s%s" % (time.time() * 1000, os.urandom(4).hex(), ext))
+    try:
+        with open(tmp, "wb") as out:
+            left = n
+            while left > 0:
+                chunk = handler.rfile.read(min(left, 256 * 1024))
+                if not chunk:
+                    raise OSError("The upload was cut off.")
+                out.write(chunk)
+                left -= len(chunk)
+    except OSError as e:
+        handler.close_connection = True
+        try:
+            os.remove(tmp)
         except OSError:
             pass
-    return None
+        return files._json(handler, 400, {"ok": False, "error": str(e)})
+    title = q.get("title", [""])[0] or os.path.splitext(name)[0]
+    r = radio_admin(settings.get()["radio"], "POST", "/api/tracks/import",
+                    {"file": os.path.basename(tmp), "title": title}, timeout=60)
+    if not r.get("ok"):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    return files._json(handler, 200 if r.get("ok") else 400, r)
 
 
 def radio_now(base):
@@ -276,20 +343,7 @@ def radio_now(base):
 
 
 def radio_skip(base):
-    token = _radio_token()
-    if not token:
-        return {"ok": False, "error": "The radio's admin token was not found (~/home-radio/.env)."}
-    try:
-        req = urllib.request.Request(base.rstrip("/") + "/api/tracks/skip", data=b"{}", method="POST",
-                                     headers={**UA, "Authorization": "Bearer " + token,
-                                              "Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            r.read(65536)
-        return {"ok": True}
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "error": "The radio refused (%d)." % e.code}
-    except OSError:
-        return {"ok": False, "error": RADIO_OFF}
+    return radio_admin(base, "POST", "/api/tracks/skip")
 
 
 def _relay(handler, url, ctype, error):
@@ -756,6 +810,8 @@ def api_get(path, settings):
     cfg = settings.get()
     if path == "/api/radio/now":
         return radio_now(cfg["radio"])
+    if path == "/api/radio/tracks":
+        return radio_admin(cfg["radio"], "GET", "/api/tracks")
     if path == "/api/camera/settings":
         return camera_settings(cfg["camera"])
     if path == "/api/detect/state":
@@ -785,6 +841,21 @@ def api_post(path, body, settings):
     cfg = settings.get()
     if path == "/api/radio/skip":
         return radio_skip(cfg["radio"])
+    if path.startswith("/api/radio/"):
+        base = cfg["radio"]
+        if path == "/api/radio/from-url":
+            return radio_admin(base, "POST", "/api/tracks/from-url", {"url": body.get("url"), "title": body.get("title")})
+        if path == "/api/radio/reorder":
+            return radio_admin(base, "PATCH", "/api/tracks/reorder", {"order": body.get("order")})
+        if path == "/api/radio/track":
+            fields = {k: body[k] for k in ("title", "visible") if k in body}
+            return radio_admin(base, "PATCH", "/api/tracks/%d" % int(body.get("id", 0)), fields)
+        if path == "/api/radio/delete":
+            return radio_admin(base, "DELETE", "/api/tracks/%d" % int(body.get("id", 0)))
+        if path == "/api/radio/restart":
+            return radio_admin(base, "POST", "/api/server/restart")
+        if path == "/api/radio/public":
+            return radio_admin(base, "POST", "/api/server/public", {"on": body.get("on") is True})
     if path == "/api/camera/control":
         return camera_control(cfg["camera"], body.get("var"), body.get("val"))
     if path == "/api/detect/record":

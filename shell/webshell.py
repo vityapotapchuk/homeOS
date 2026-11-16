@@ -624,7 +624,7 @@ def make_handler(app):
             origin = self.headers.get("Origin")
             if origin and urlparse(origin).netloc.lower() != self.headers.get("Host", "").lower():
                 return self._send(403, {"error": "cross-site request refused"})
-            if path == "/api/files/upload":          # the body is the file, not JSON: check the session first
+            if path in ("/api/files/upload", "/api/radio/upload"):   # the body is a file, not JSON: check the session first
                 if not app.session(self._token()):
                     self.close_connection = True
                     return self._send(401, {"error": "login"})
@@ -632,6 +632,8 @@ def make_handler(app):
                 if not hmac.compare_digest(got.encode(), app.session(self._token())["csrf"].encode()):
                     self.close_connection = True
                     return self._send(403, {"error": "forbidden"})
+                if path == "/api/radio/upload":
+                    return apps.radio_upload(self, url.query, app.settings)
                 return apps.files.receive(self, url.query)
             try:
                 n = int(self.headers.get("Content-Length", "0"))
